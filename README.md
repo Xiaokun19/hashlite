@@ -6,6 +6,9 @@ Android 文件哈希计算 / 校验工具，本仓库**只有一个模块**：
 |---|---|---|
 | `:hashlite` | 哈希计算 / `io.github.xiaokun19.hashlite` | 纯净版：10 个常用算法 + 批量校验 / 并行哈希，界面为主 |
 
+> **远程仓库**：<https://github.com/Xiaokun19/hashlite>（私有）·
+> **CI**：`.github/workflows/ci.yml`，push / PR 时在 ubuntu-latest 上跑 **48 个单测 + Debug APK**（APK 作为 artifact）。
+
 详细设计（算法表、硬件加速两层检测、引擎、批量校验、图标流水线、全部实测数据）见 **[`hashlite/README.md`](hashlite/README.md)**。
 
 
