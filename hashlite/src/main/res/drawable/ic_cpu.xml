@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  硬件加速徽标：CPU/SoC 芯片（外壳 + 内核 + 引脚）。
+  小尺寸（~14dp）下要能看清，所以：笔画偏粗、引脚只有 3 对、内核给足面积。
+  颜色不重要，显示时由 Compose 的 Icon(tint = ...) 统一着色。
+-->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+
+    <!-- 引脚 -->
+    <path
+        android:pathData="M9,2.6 V5.2 M12,2.6 V5.2 M15,2.6 V5.2 M9,18.8 V21.4 M12,18.8 V21.4 M15,18.8 V21.4 M2.6,9 H5.2 M2.6,12 H5.2 M2.6,15 H5.2 M18.8,9 H21.4 M18.8,12 H21.4 M18.8,15 H21.4"
+        android:strokeColor="#FF000000"
+        android:strokeLineCap="round"
+        android:strokeWidth="2.1" />
+
+    <!-- 外壳 -->
+    <path
+        android:pathData="M8.4,5.2 H15.6 A3.2,3.2 0 0 1 18.8,8.4 V15.6 A3.2,3.2 0 0 1 15.6,18.8 H8.4 A3.2,3.2 0 0 1 5.2,15.6 V8.4 A3.2,3.2 0 0 1 8.4,5.2 Z"
+        android:strokeColor="#FF000000"
+        android:strokeWidth="2.1" />
+
+    <!-- 内核 -->
+    <path
+        android:pathData="M9.2,9.2 H14.8 V14.8 H9.2 Z"
+        android:fillColor="#FF000000" />
+</vector>

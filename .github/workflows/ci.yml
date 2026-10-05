@@ -1,0 +1,67 @@
+name: CI
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+  workflow_dispatch:
+
+# 只读权限就够（要自动发 Release 时再单独加 contents: write）
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: 单测 + Debug APK
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      # 负责 Gradle 依赖缓存；gradle 发行版由仓库自带的 wrapper 提供
+      # （gradle/wrapper/gradle-wrapper.properties 用的是官方 services.gradle.org 地址）
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      # 注意：不要在 CI 上跑 setup_android_env.sh —— 那个脚本是给 ARM64 本机
+      # （proot/Ubuntu aarch64）用的：它会把 SDK 里的 aapt2 换成随仓库携带的 ARM64 版本，
+      # 在 x86_64 runner 上必然对不上。runner 自带 SDK 与已接受的许可，AGP 会自己按需补组件。
+
+      - name: Unit tests
+        run: ./gradlew :hashlite:test --console=plain
+
+      - name: Assemble debug APK
+        run: ./gradlew :hashlite:assembleDebug --console=plain
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: hashlite-debug-apk
+          path: hashlite/build/outputs/apk/debug/*.apk
+          if-no-files-found: error
+
+      - name: Upload test reports
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-reports
+          path: hashlite/build/reports/tests/
+          if-no-files-found: ignore
+
+  # ---------------------------------------------------------------------------
+  # 以后要用 NDK 出 aarch64 的 .so（比如给 SHA-3/SM3 做 NEON/EOR3 实现）时，
+  # 在这里加一个 job：runs-on: ubuntu-latest + 装 NDK（或直接用 runner 自带的），
+  # 用 `./gradlew :hashlite:assembleRelease`（或 externalNativeBuild 任务）出包，
+  # 再把 .so / AAR 作为 artifact 上传，或者推到 Release。
+  # ---------------------------------------------------------------------------
