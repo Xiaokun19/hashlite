@@ -49,3 +49,10 @@ am start -n io.github.xiaokun19.hashlite/.MainActivity -e batchcheck 1 -e files 
 | `hashlite/README.md` | 纯净版完整设计文档（先看这个） |
 | `setup_android_env.sh` | ARM64 aapt2 与构建环境初始化 |
 | `gradle/libs.versions.toml` | 依赖与插件版本目录 |
+
+## 许可证
+
+本项目以 **MIT** 协议开源（见 [`LICENSE`](LICENSE)）。
+
+随仓库携带的 vendored OpenSSL 汇编与运行期依赖（AndroidX / Bouncy Castle）的许可说明，
+见 [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md) 与 [`LICENSES/`](LICENSES/)。

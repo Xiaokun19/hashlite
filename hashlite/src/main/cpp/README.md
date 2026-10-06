@@ -1,6 +1,7 @@
 # cpp/ —— native Keccak（vendored 第三方汇编 + 薄封装）
 
 给 App 提供 SHA-3/SHAKE 的 native 实现。**实测比 BouncyCastle 快 2.8×**
+（SHA3-256 1017.8 vs 367.7 MB/s；本机实测）。
 
 ## 目录
 
@@ -12,12 +13,17 @@
 | `test_linux.c` | 本地验证程序（gcc 直接编，不需要 NDK）：向量自检 + 与系统 OpenSSL 对拍 + 测速 |
 | `CMakeLists.txt` | 只针对 arm64-v8a |
 
-## 许可证（要发布时请照做）
+## 许可证
 
-- OpenSSL 3.x 本体是 **Apache-2.0**；
-- 这份 `.pl` / 生成的 `.S` 还额外受 **CRYPTOGAMS 许可**（Andy Polyakov，BSD 风格）约束，
-  属"双许可"——**随项目分发时保留文件头说明**；若要把汇编单独再发布，请一并带上两份许可文本。
-- 生成物里保留了原作者署名串（`CRYPTOGAMS by <appro@openssl.org>`），请勿删除。
+本项目整体为 **MIT**（见仓库根 `LICENSE`）。本目录的 `keccak1600-armv8.S` 是 vendored 第三方代码：
+
+- **来源**：OpenSSL 3.0.13 `crypto/sha/asm/keccak1600-armv8.pl` 的官方生成物；已对拍——本仓库文件
+  （除头部说明外）与官方重新生成**逐行一致**，指令本体未改动。
+- **版权**：Copyright 2017-2020 The OpenSSL Project Authors。Written by Andy Polyakov <appro@openssl.org>。
+- **许可**：**Apache License 2.0**（副本取自 OpenSSL 项目；上游原件同时声明
+  "dual licensed under OpenSSL and CRYPTOGAMS licenses depending on where you obtain it"，
+  见 https://www.openssl.org/~appro/cryptogams/）。
+- **落点**：许可全文 `LICENSES/Apache-2.0.txt`、声明 `THIRD_PARTY_NOTICES.md`；文件头的前置说明请一并保留。
 
 ## 重新生成
 

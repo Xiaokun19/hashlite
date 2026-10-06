@@ -1,13 +1,19 @@
 // ===========================================================================
 // vendored 第三方代码（指令本体未改动，仅前置本说明）
 //
-// 来源：OpenSSL 3.0.13  crypto/sha/asm/keccak1600-armv8.pl 的生成物
-// 生成：perl crypto/sha/asm/keccak1600-armv8.pl linux64 keccak1600-armv8.S
-// 版权：The OpenSSL Project / CRYPTOGAMS by <appro@openssl.org>（双许可）
+// 来源：OpenSSL 3.0.13  crypto/sha/asm/keccak1600-armv8.pl 的官方生成物
+//       （perl keccak1600-armv8.pl linux64；与本仓库文件逐行对拍一致）
+// 版权：Copyright 2017-2020 The OpenSSL Project Authors
+//       Written by Andy Polyakov <appro@openssl.org>
+// 许可：Apache License 2.0（副本取自 OpenSSL 项目；原件另声明
+//       "dual licensed under OpenSSL and CRYPTOGAMS licenses
+//        depending on where you obtain it"）
+//       全文见仓库根 LICENSES/Apache-2.0.txt 与 THIRD_PARTY_NOTICES.md
 //
 // 内容：两套 KeccakF1600 —— 普通变体（SHA3_absorb/SHA3_squeeze）与
 //       ARMv8.2-SHA3 扩展变体（SHA3_absorb_cext/SHA3_squeeze_cext，
 //       用 EOR3/RAX1/XAR/BCAX，以 .inst 编码给出，任何汇编器都可接受）。
+//       运行时到底用哪套由 keccak_native.c 按实测选择（见 cpp/README.md）。
 // ===========================================================================
 .text
 
