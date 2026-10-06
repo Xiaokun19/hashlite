@@ -88,6 +88,7 @@ object NativeSelfCheck {
         )
         sb.appendLine()
         sb.appendLine("注：native 路径只在向量自检通过时才启用；自检不过会回退 BC（宁可慢，不产出错哈希）。")
+        sb.appendLine("变体校正：首次遇到 ≥8 MiB 大块时实测选一次 —— 本次校正后 = ${NativeKeccak.variantName()}")
         return sb.toString()
     }
 

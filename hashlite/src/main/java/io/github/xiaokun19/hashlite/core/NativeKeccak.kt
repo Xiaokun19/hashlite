@@ -29,19 +29,26 @@ object NativeKeccak {
         false
     }
 
-    /** 可用 = 库在 且 向量自检过；首次判定时顺带实测选变体。 */
+    /** 可用 = 库在 且 向量自检过（惰性、只做一次）。自检不过就回退——宁可慢也绝不产出错哈希。 */
     val usable: Boolean by lazy {
-        if (!loaded) {
-            false
-        } else {
-            val passes = runCatching { selfTest() == 0 }.getOrDefault(false)
-            if (passes) {
-                // 4 MiB × 两种变体 ≈ 25 ms，一次性
-                runCatching { chooseByBench(4) }
-            }
-            passes
-        }
+        if (!loaded) false else runCatching { selfTest() == 0 }.getOrDefault(false)
     }
+
+    /**
+     * 变体校正：**只在首次遇到"大块"时做一次**（默认 8 MiB 起）。
+     *
+     * 为什么不放在 [usable] 里：小文件不该为校正买单（16 MiB × 两变体 ≈ 0.2 s，
+     * 对 1 MB 的文件就是灾难）；而大文件正好把它摊薄。
+     * 为什么不只用 HWCAP：作者注释里存在"扩展指令反而更慢"的核（Cortex-X2 11.3 vs 6.1 c/B），
+     */
+    fun calibrateIfNeeded(chunkBytes: Int) {
+        if (calibrated || chunkBytes < 8 * 1024 * 1024) return
+        if (!usable) return
+        calibrated = true
+        runCatching { chooseByBench(16) }
+    }
+
+    private var calibrated = false
 
     @JvmStatic
     external fun haveSha3Ext(): Boolean
@@ -93,6 +100,7 @@ class NativeBlockDigest(private val rate: Int, private val outBytes: Int) : Bloc
         val position = buffer.position()
         val length = buffer.remaining()
         if (length <= 0) return
+        NativeKeccak.calibrateIfNeeded(length) // 首次遇到大块时校正变体（整个进程只一次）
         if (buffer.isDirect) {
             NativeKeccak.updateDirect(handle, buffer, position, length)
             buffer.position(buffer.limit())
@@ -104,7 +112,9 @@ class NativeBlockDigest(private val rate: Int, private val outBytes: Int) : Bloc
     }
 
     override fun update(bytes: ByteArray, offset: Int, length: Int) {
-        if (length > 0) NativeKeccak.updateArray(handle, bytes, offset, length)
+        if (length <= 0) return
+        NativeKeccak.calibrateIfNeeded(length)
+        NativeKeccak.updateArray(handle, bytes, offset, length)
     }
 
     override fun finish(): ByteArray {
