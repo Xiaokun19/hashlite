@@ -14,8 +14,8 @@
 |---|---|---|---|
 | 常用 | MD5 | 平台 | 软件（无对应指令） |
 | 常用 | SHA-1 / 224 / 256 / 384 / 512 | 平台 BoringSSL | **ARMv8 指令，实测比软件快 11–29×** |
-| 更多（默认折叠） | SHA3-256 / SHA3-512 | BouncyCastle | 纯软件（CPU 有 `sha3` 指令，但 Android 平台无实现） |
-| 更多 | SM3（国密） | BouncyCastle | 纯软件（同上，CPU 有 `sm3` 指令） |
+| 更多（默认折叠） | SHA3-256 / SHA3-512 | **native**（vendored OpenSSL 汇编）→ 回退 BouncyCastle | native 实测比 BC **快 2.8×**（1017.8 vs 367.7 MB/s，见下） |
+| 更多 | SM3（国密） | BouncyCastle | 纯软件（CPU 有 `sm3` 指令，但平台无实现、也还没写 native） |
 | 更多 | CRC32 | java.util.zip（native/zlib） | 实测比 Java 查表实现快 26–34× |
 
 - "更多"默认折叠，点标题行展开；**收起时会自动取消其中已勾选项**，避免"看不见却还在算"。
@@ -156,6 +156,25 @@ SM3        徽标=灭   纯软件实现；CPU 有 sm3 指令但平台无实现
 3. `Android/data`、`Android/obb` 在系统 SAF 选择器里**根本选不了**；根目录/下载内容根会弹
    「无法使用此文件夹」，必须先进子目录才能点"使用这个文件夹"。
 4. App 无 root → 无法 `drop_caches`，所有速度数字都带"页缓存命中"这个前提。
+
+## native Keccak（SHA-3 提速 2.8×）
+
+SHA3-256/512 走 **native**（vendored OpenSSL aarch64 汇编，`src/main/cpp/`），细节与许可见 `cpp/README.md`。
+
+- **两道门**：`.so` 加载成功 **且** 向量自检通过才启用；否则回退 BouncyCastle——**宁可慢，不产出错哈希**；
+- **变体校正**：汇编里有两套实现（普通 / EOR3 扩展）。首次遇到 ≥8 MiB 大块时用 16 MiB 实测，
+  只有 EOR3 真快 >3% 才切（作者注释里存在"扩展反而更慢"的核）；
+- **实测**（本机，App 内交替测量）：SHA3-256 **1017.8 MB/s vs BC 367.7 MB/s = 2.77×**，
+  与 BC 逐字节一致；64 MiB 内存基准里 plain 772.8 / cext 989.8 MB/s（1.28×）；
+- **构建**：native 默认**不在本地编**（NDK 宿主工具链只有 x86_64，ARM64 手机跑不了），
+  由 CI 用 `-Phashlite.native=true` 出 `.so`；本地开发循环不受影响（自动回退 BC）。
+
+自检入口（无头，报告写到 App 外部目录）：
+
+```bash
+am start -n io.github.xiaokun19.hashlite/.MainActivity -e nativecheck 1
+cat /sdcard/Android/data/io.github.xiaokun19.hashlite/files/nativecheck.txt
+```
 
 ## 图标
 
