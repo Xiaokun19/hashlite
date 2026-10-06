@@ -22,20 +22,27 @@ android {
         manifestPlaceholders["hashliteNative"] = "false"
     }
 
-    // 仓库自带的调试签名（口令是 Android 惯例的 "android"，只是 debug key）。
-    // 目的：**CI 出的 APK 能直接覆盖本机编译的 APK**，省掉"签名不匹配 → 先卸载"的来回。
+    // 共享调试签名：debug.keystore 不进仓库（公开仓库零密钥）。
+    //  - 本机开发者：把 keystore 放到 hashlite/debug.keystore（该文件已被 .gitignore 忽略）；
+    //  - CI：构建前从 Actions Secret（DEBUG_KEYSTORE_B64）恢复同一把 key；
+    //  - 找不到文件时自动回退为 AGP 默认 debug 签名（fork / 无 secret 也能正常构建，只是签名不同）。
+    val hasSharedKeystore = file("debug.keystore").exists()
     signingConfigs {
-        create("sharedDebug") {
-            storeFile = file("debug.keystore")
-            storePassword = "android"
-            keyAlias = "hashdebug"
-            keyPassword = "android"
+        if (hasSharedKeystore) {
+            create("sharedDebug") {
+                storeFile = file("debug.keystore")
+                storePassword = "android"
+                keyAlias = "hashdebug"
+                keyPassword = "android"
+            }
         }
     }
 
     buildTypes {
         getByName("debug") {
-            signingConfig = signingConfigs.getByName("sharedDebug")
+            if (hasSharedKeystore) {
+                signingConfig = signingConfigs.getByName("sharedDebug")
+            }
         }
         release {
             isMinifyEnabled = false
@@ -62,6 +69,7 @@ android {
     // libkeccak.so 的汇编是 aarch64 专属，而 NDK 的**宿主工具链只有 x86_64**——
     // 本机（ARM64 proot）根本执行不了 NDK 编译器，所以本地默认不编 native
     // （App 会自动回退 BouncyCastle，功能不受影响），由 CI（x86_64 runner）加
+    // -Phashlite.native=true 出 .so。细节见 hashlite/src/main/cpp/README.md。
     val nativeEnabled = (project.findProperty("hashlite.native") as String?)?.toBoolean() == true
     if (nativeEnabled) {
         ndkVersion = "28.2.13676358"

@@ -25,6 +25,9 @@ Android 文件哈希计算 / 校验工具，本仓库**只有一个模块**：
 - 环境：JDK 17 / Android SDK `/root/Android`（platforms;android-35）/ Gradle 9.1 wrapper / AGP 9.0.0 /
   Kotlin 2.3.10 / Compose BOM 2026.01.01；minSdk 24 / compileSdk 35 / targetSdk 35。
 - 依赖只有 BouncyCastle（`bcprov-jdk18on`，SHA-3 / SM3 用），版本在根 `gradle/libs.versions.toml` 统一管。
+- **签名**：仓库**不含任何签名密钥**。克隆后直接编译会使用你机器的默认 debug 签名；
+  维护者 CI 产物使用共享 debug key（仅存于 Actions Secret）。正式版（Release）将使用独立的
+  release key（同样只存于 Secrets）——**debug 版与正式版签名不同、互不覆盖**。
 
 
 ```bash
