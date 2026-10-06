@@ -1,5 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
 
-    <style name="Theme.HashLite" parent="android:Theme.Material.Light.NoActionBar" />
+    <style name="Theme.HashLite" parent="android:Theme.Material.Light.NoActionBar">
+        <!-- 冷启动窗口背景跟随系统深浅色（App 内手动改主题只影响应用内，冷启动闪屏以系统为准） -->
+        <item name="android:windowBackground">@color/window_background</item>
+    </style>
 </resources>

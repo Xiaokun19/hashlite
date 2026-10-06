@@ -1,6 +1,7 @@
 package io.github.xiaokun19.hashlite.core
 
 import java.util.Locale
+import kotlin.math.roundToLong
 
 /** 十六进制、单位、耗时格式化，以及"粘贴的校验值"解析与比对。 */
 object HashParse {
@@ -87,9 +88,14 @@ object HashParse {
         else -> String.format(Locale.US, "%.2f s", nanos / 1_000_000_000.0)
     }
 
-    fun formatEta(seconds: Double): String = when {
-        seconds <= 0.0 -> ""
-        seconds < 60 -> String.format(Locale.US, "约 %.0f 秒", seconds)
-        else -> String.format(Locale.US, "约 %d 分 %02d 秒", (seconds / 60).toInt(), (seconds % 60).toInt())
+    /**
+     * ETA 的整数分解：(分, 秒)；没有 ETA 时返回 null。
+     *
+     * 不在这里拼文案：具体文字由 UI 层按当前语言组装（见 ui/UiFormat.kt 的 etaText）。
+     */
+    fun etaParts(seconds: Double): Pair<Long, Long>? {
+        if (seconds.isNaN() || seconds <= 0.0) return null
+        val total = seconds.roundToLong()
+        return if (total < 60) 0L to total else (total / 60) to (total % 60)
     }
 }

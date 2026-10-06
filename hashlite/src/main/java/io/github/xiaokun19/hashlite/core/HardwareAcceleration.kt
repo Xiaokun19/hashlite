@@ -282,17 +282,9 @@ object HardwareAcceleration {
     fun cachedNote(context: Context): String? =
         context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getString("probeNote", null)
 
-    /** 界面顶部那一行小字：本机实际能吃到硬件加速的是哪几个。 */
-    fun headerSummary(flags: CpuFlags, ratios: Map<LiteAlgorithm, Double>): String {
-        val hw = LiteAlgorithm.COMMON
-            .filter { it.kind == LiteAlgorithm.Kind.JCA && isAccelerated(it, flags, ratios) }
-            .joinToString("/") { it.label }
-        return if (hw.isEmpty()) {
-            "未检测到可用的硬件哈希指令"
-        } else {
-            "硬件指令已启用：$hw"
-        }
-    }
+    /** 已吃上硬件加速的常用算法（供 UI 组装“硬件指令已启用：…”文案）。 */
+    fun acceleratedCommon(flags: CpuFlags, ratios: Map<LiteAlgorithm, Double>): List<LiteAlgorithm> =
+        LiteAlgorithm.COMMON.filter { it.kind == LiteAlgorithm.Kind.JCA && isAccelerated(it, flags, ratios) }
 
     /** 给报告/帮助用的文字：解释某算法为什么能/不能亮徽标。 */
     fun explain(algorithm: LiteAlgorithm, flags: CpuFlags, ratios: Map<LiteAlgorithm, Double>): String {

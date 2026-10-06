@@ -13,11 +13,13 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
@@ -29,16 +31,24 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import io.github.xiaokun19.hashlite.AppSettings
 import io.github.xiaokun19.hashlite.HashService
+import io.github.xiaokun19.hashlite.R
+import io.github.xiaokun19.hashlite.ThemeMode
 import io.github.xiaokun19.hashlite.core.LiteAlgorithm
 
 /**
  * 设置面板（自底升起，和帮助页同一套容器语言）。
  *
- * 三个开关都围绕"长任务体验"：屏幕常亮 / 常驻通知（前台服务）/ 完成通知。
+ * 分三块：
+ * - 外观与语言：深浅色（跟随系统 / 浅色 / 深色）、界面语言（跟随系统 / 中文 / English）；
+ * - 计算体验：屏幕常亮 / 常驻通知（前台服务）/ 完成通知 / 保持唤醒 / 电池白名单；
+ * - 关于：版本、包名、SHA3 实现、权限、通知渠道。
  */
 @Composable
 fun SettingsSheet(
@@ -48,10 +58,15 @@ fun SettingsSheet(
     notifyPermissionGranted: Boolean,
     batteryUnrestricted: Boolean,
     keepAwake: Boolean,
+    themeMode: ThemeMode,
+    language: String,
+    languageEnabled: Boolean,
     onKeepScreenOn: (Boolean) -> Unit,
     onNotifyProgress: (Boolean) -> Unit,
     onNotifyResult: (Boolean) -> Unit,
     onKeepAwake: (Boolean) -> Unit,
+    onThemeMode: (ThemeMode) -> Unit,
+    onLanguage: (String) -> Unit,
     onRequestUnrestricted: () -> Unit,
     onClose: () -> Unit,
     modifier: Modifier = Modifier,
@@ -89,50 +104,77 @@ fun SettingsSheet(
                     .padding(start = 20.dp, end = 12.dp, top = 10.dp, bottom = 4.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                Text("设置", fontSize = 18.sp, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
-                TextButton(onClick = onClose) { Text("关闭") }
+                Text(
+                    stringResource(R.string.settings_title),
+                    fontSize = 18.sp,
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier.weight(1f),
+                )
+                TextButton(onClick = onClose) { Text(stringResource(R.string.action_close)) }
             }
 
+            // navigationBarsPadding：三键导航栏出现时，底部内容不会被挡住（内容可滚到其上方）
             Column(
                 modifier = Modifier
                     .weight(1f)
                     .verticalScroll(rememberScrollState())
+                    .navigationBarsPadding()
                     .padding(start = 20.dp, end = 20.dp, bottom = 24.dp),
                 verticalArrangement = Arrangement.spacedBy(4.dp),
             ) {
-                SectionTitle("计算体验")
+                SectionTitle(stringResource(R.string.settings_section_appearance))
+
+                ChoiceRow(
+                    title = stringResource(R.string.settings_theme),
+                    subtitle = stringResource(R.string.settings_theme_hint),
+                    options = ThemeMode.entries.map { it to themeLabel(it) },
+                    selected = themeMode,
+                    onSelect = onThemeMode,
+                )
+
+                ChoiceRow(
+                    title = stringResource(R.string.settings_language),
+                    subtitle = stringResource(R.string.settings_language_hint),
+                    options = listOf(
+                        AppSettings.LANG_SYSTEM to stringResource(R.string.lang_system),
+                        AppSettings.LANG_ZH to "中文",
+                        AppSettings.LANG_EN to "English",
+                    ),
+                    selected = language,
+                    onSelect = onLanguage,
+                    enabled = languageEnabled,
+                )
+
+                SectionTitle(stringResource(R.string.settings_section_compute))
 
                 SwitchRow(
-                    title = "计算时保持屏幕常亮",
-                    subtitle = "不用任何权限；但它只挡\"自动熄屏\"——手动按电源键无效（那种情况看下面两项）",
+                    title = stringResource(R.string.settings_keep_screen_on),
+                    subtitle = stringResource(R.string.settings_keep_screen_on_sub),
                     checked = keepScreenOn,
                     onCheckedChange = onKeepScreenOn,
                 )
 
+                val notifyProgressSub = stringResource(R.string.settings_notify_progress_sub) +
+                    if (!notifyPermissionGranted) stringResource(R.string.settings_notify_perm_warning) else ""
                 SwitchRow(
-                    title = "常驻通知（进度 / 取消）",
-                    subtitle = buildString {
-                        append("长任务时显示进度、可一键取消（前台服务），也能降低被系统冻结的概率")
-                        append("；本机实测：灭屏后仍可能被冻结，故还有下面两项兜底")
-                        if (!notifyPermissionGranted) append("\n⚠ 系统通知权限未授予：抽屉里看不到这条通知（服务本身仍会运行）")
-                    },
+                    title = stringResource(R.string.settings_notify_progress),
+                    subtitle = notifyProgressSub,
                     checked = notifyProgress,
                     onCheckedChange = onNotifyProgress,
                     warn = !notifyPermissionGranted && notifyProgress,
                 )
 
                 SwitchRow(
-                    title = "完成后通知",
-                    subtitle = "成功 / 校验不通过 / 失败时提醒一次，可点开回到 App",
+                    title = stringResource(R.string.settings_notify_result),
+                    subtitle = stringResource(R.string.settings_notify_result_sub),
                     checked = notifyResult,
                     onCheckedChange = onNotifyResult,
                     warn = !notifyPermissionGranted && notifyResult,
                 )
 
                 SwitchRow(
-                    title = "熄屏后继续计算（保持唤醒）",
-                    subtitle = "长任务期间持有部分唤醒锁（CPU 不休眠）。对本机 ROM 的灭屏冻结不保证有效，" +
-                        "属于最后一道保险；代价是耗电略增",
+                    title = stringResource(R.string.settings_keep_awake),
+                    subtitle = stringResource(R.string.settings_keep_awake_sub),
                     checked = keepAwake,
                     onCheckedChange = onKeepAwake,
                 )
@@ -145,14 +187,15 @@ fun SettingsSheet(
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Column(modifier = Modifier.weight(1f)) {
-                        Text("不受电池优化限制", fontSize = 14.sp, fontWeight = FontWeight.Medium)
                         Text(
-                            if (batteryUnrestricted) {
-                                "已加入白名单：灭屏 / 后台不会被系统冻结"
-                            } else {
-                                "未加入：本机 ROM 灭屏后会冻结 App（实测连前台服务也会被冻住，" +
-                                    "长任务会停在半路）——建议加入白名单"
-                            },
+                            stringResource(R.string.settings_battery),
+                            fontSize = 14.sp,
+                            fontWeight = FontWeight.Medium,
+                        )
+                        Text(
+                            stringResource(
+                                if (batteryUnrestricted) R.string.settings_battery_on else R.string.settings_battery_off,
+                            ),
                             fontSize = 11.sp,
                             lineHeight = 15.sp,
                             color = if (batteryUnrestricted) colors.onSurfaceVariant else colors.error,
@@ -162,21 +205,42 @@ fun SettingsSheet(
                     if (batteryUnrestricted) {
                         Text("✓", fontSize = 15.sp, color = colors.primary)
                     } else {
-                        TextButton(onClick = onRequestUnrestricted) { Text("去设置", fontSize = 13.sp) }
+                        TextButton(onClick = onRequestUnrestricted) {
+                            Text(stringResource(R.string.action_go_settings), fontSize = 13.sp)
+                        }
                     }
                 }
 
                 Spacer(Modifier.height(14.dp))
-                SectionTitle("关于")
+                SectionTitle(stringResource(R.string.settings_section_about))
 
-                InfoRow("版本", versionName(context))
-                InfoRow("包名", context.packageName)
-                InfoRow("SHA3 实现", LiteAlgorithm.SHA3_256.implementation)
-                InfoRow("权限", "不申请存储权限；文件通过 SAF 只读访问")
-                InfoRow("通知渠道", "${HashService.CHANNEL_PROGRESS}（进度·静音） / ${HashService.CHANNEL_RESULT}（提醒）")
+                InfoRow(stringResource(R.string.about_version), versionName(context))
+                InfoRow(stringResource(R.string.about_package), context.packageName)
+                InfoRow(
+                    stringResource(R.string.about_sha3),
+                    stringResource(
+                        if (LiteAlgorithm.SHA3_256.nativeAccelerated) R.string.impl_native else R.string.impl_bouncy,
+                    ),
+                )
+                InfoRow(stringResource(R.string.about_permissions), stringResource(R.string.about_permissions_value))
+                InfoRow(
+                    stringResource(R.string.about_channels),
+                    stringResource(
+                        R.string.about_channels_value,
+                        HashService.CHANNEL_PROGRESS,
+                        HashService.CHANNEL_RESULT,
+                    ),
+                )
             }
         }
     }
+}
+
+@Composable
+private fun themeLabel(mode: ThemeMode): String = when (mode) {
+    ThemeMode.SYSTEM -> stringResource(R.string.theme_system)
+    ThemeMode.LIGHT -> stringResource(R.string.theme_light)
+    ThemeMode.DARK -> stringResource(R.string.theme_dark)
 }
 
 @Composable
@@ -188,6 +252,38 @@ private fun SectionTitle(text: String) {
         color = MaterialTheme.colorScheme.primary,
         modifier = Modifier.padding(top = 10.dp, bottom = 4.dp),
     )
+}
+
+/** 单选：一排等宽 chips（主题、语言都用它）。 */
+@Composable
+private fun <T> ChoiceRow(
+    title: String,
+    subtitle: String,
+    options: List<Pair<T, String>>,
+    selected: T,
+    onSelect: (T) -> Unit,
+    enabled: Boolean = true,
+) {
+    val colors = MaterialTheme.colorScheme
+    Column(modifier = Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Column {
+            Text(title, fontSize = 14.sp, fontWeight = FontWeight.Medium)
+            Text(subtitle, fontSize = 11.sp, lineHeight = 15.sp, color = colors.onSurfaceVariant)
+        }
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+            options.forEach { (value, label) ->
+                FilterChip(
+                    selected = value == selected,
+                    onClick = { onSelect(value) },
+                    label = {
+                        Text(label, fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    },
+                    enabled = enabled,
+                    modifier = Modifier.weight(1f),
+                )
+            }
+        }
+    }
 }
 
 @Composable
@@ -251,7 +347,7 @@ fun batteryUnrestricted(context: Context): Boolean = runCatching {
  * 拉起系统的"忽略电池优化"授权页。
  *
  * 为什么需要它：本机 ROM 在灭屏后会冻结 App——实测**连前台服务也一起冻**
- * （长任务跑一半停住、CPU 不再推进）。白名单是唯一能改变这个行为的开关。
+ * （长任务跑一半停住、CPU 不再推进）。白名单是 App 侧能改变这个行为的开关里最标准的一个。
  */
 fun requestBatteryUnrestricted(context: Context) {
     runCatching {

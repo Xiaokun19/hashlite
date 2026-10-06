@@ -84,12 +84,16 @@ enum class LiteAlgorithm(
         Kind.CRC32 -> Crc32Digest()
     }
 
+    /** SHA3-256/512 且 native 库可用（加载成功 + 向量自检通过）。 */
+    val nativeAccelerated: Boolean
+        get() = (this == SHA3_256 || this == SHA3_512) && NativeKeccak.usable
+
     /** 当前实际会用的实现来源（诊断/展示用）。 */
     val implementation: String
         get() = when (kind) {
             Kind.JCA -> "平台"
             Kind.CRC32 -> "zlib"
-            Kind.BC -> if ((this == SHA3_256 || this == SHA3_512) && NativeKeccak.usable) "native" else "BC"
+            Kind.BC -> if (nativeAccelerated) "native" else "BC"
         }
 
     companion object {

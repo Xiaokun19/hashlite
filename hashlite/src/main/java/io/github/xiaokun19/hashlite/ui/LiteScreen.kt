@@ -58,6 +58,7 @@ import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
@@ -68,6 +69,7 @@ import androidx.compose.ui.text.TextStyle
 import io.github.xiaokun19.hashlite.AppSettings
 import io.github.xiaokun19.hashlite.R
 import io.github.xiaokun19.hashlite.RunKeeper
+import io.github.xiaokun19.hashlite.ThemeMode
 import io.github.xiaokun19.hashlite.core.AndroidFileSource
 import io.github.xiaokun19.hashlite.core.HashParse
 import io.github.xiaokun19.hashlite.core.HashProgress
@@ -127,7 +129,7 @@ class LiteUiState {
 
     fun attach(context: Context, uri: Uri) {
         fileUri = uri
-        fileName = queryName(context, uri).ifBlank { "分享的文件" }
+        fileName = queryName(context, uri).ifBlank { context.getString(R.string.fallback_shared_file) }
         fileSize = querySize(context, uri)
         outcome = null
         progress = null
@@ -157,6 +159,8 @@ class LiteUiState {
 fun LiteScreen(
     incomingUri: Uri? = null,
     incomingNonce: Long = 0L,
+    themeMode: ThemeMode = ThemeMode.SYSTEM,
+    onThemeModeChange: (ThemeMode) -> Unit = {},
     state: LiteUiState = remember { LiteUiState() },
 ) {
     val context = LocalContext.current
@@ -172,6 +176,7 @@ fun LiteScreen(
     var notifyProgress by remember { mutableStateOf(appSettings.notifyProgress) }
     var notifyResult by remember { mutableStateOf(appSettings.notifyResult) }
     var keepAwake by remember { mutableStateOf(appSettings.keepAwake) }
+    var language by remember { mutableStateOf(appSettings.language) }
     var notifyGranted by remember { mutableStateOf(notificationPermissionGranted(context)) }
     var batteryOk by remember { mutableStateOf(batteryUnrestricted(context)) }
     val permissionLauncher =
@@ -235,7 +240,7 @@ fun LiteScreen(
             val result = withContext(Dispatchers.Default) {
                 runCatching {
                     val pfd = context.contentResolver.openFileDescriptor(uri, "r")
-                        ?: error("读不到这个文件；如果是分享进来的，权限可能已失效，请用「更换」重新选一次")
+                        ?: error(context.getString(R.string.error_cannot_read_file))
                     var lastUpdate = 0L
                     hasher.hash(
                         source = AndroidFileSource(pfd, state.fileName, state.fileSize),
@@ -265,22 +270,27 @@ fun LiteScreen(
             state.progress = null
             result.onSuccess { outcome ->
                 state.outcome = outcome
-                val cancelled = outcome.error == "已取消"
+                val cancelled = outcome.cancelled
                 if (outcome.error != null) state.error = outcome.error
                 RunKeeper.end(
                     context,
                     when {
-                        cancelled -> "已取消 · ${state.fileName}"
-                        outcome.success -> "✓ 哈希完成 · ${state.fileName}"
-                        else -> "✗ 哈希失败 · ${state.fileName}"
+                        cancelled -> context.getString(R.string.notif_title_cancelled, state.fileName)
+                        outcome.success -> context.getString(R.string.notif_title_done, state.fileName)
+                        else -> context.getString(R.string.notif_title_failed, state.fileName)
                     },
-                    if (cancelled) "计算已取消" else hashSummary(outcome),
+                    if (cancelled) context.getString(R.string.notif_text_cancelled) else hashSummary(context, outcome),
                     error = !outcome.success && !cancelled,
                     cancelled = cancelled,
                 )
             }.onFailure {
                 state.error = it.message ?: it.toString()
-                RunKeeper.end(context, "✗ 哈希失败 · ${state.fileName}", it.message ?: "未知错误", error = true)
+                RunKeeper.end(
+                    context,
+                    context.getString(R.string.notif_title_failed, state.fileName),
+                    it.message ?: context.getString(R.string.notif_unknown_error),
+                    error = true,
+                )
             }
         }
     }
@@ -315,7 +325,7 @@ fun LiteScreen(
     val accelerated: (LiteAlgorithm) -> Boolean = { algorithm ->
         HardwareAcceleration.isAccelerated(algorithm, cpuFlags, state.accelRatios) ||
             // SHA3 走内置 native 库时也是真·硬件指令（ARMv8.2-SHA3 的 EOR3 等），一并亮徽标
-            algorithm.implementation == "native"
+            algorithm.nativeAccelerated
     }
 
     Surface(modifier = Modifier.fillMaxSize(), color = colors.background) {
@@ -366,18 +376,24 @@ fun LiteScreen(
                 CompareCard(state = state)
 
                 state.error?.let { message ->
-                    // 用户自己取消的不算"错误"：中性色、不带"出错："前缀
-                    val cancelled = message.startsWith("已取消")
                     Text(
-                        if (cancelled) message else "出错：$message",
+                        stringResource(R.string.error_with_message, message),
                         fontSize = 12.sp,
-                        color = if (cancelled) colors.onSurfaceVariant else colors.error,
+                        color = colors.error,
+                    )
+                }
+                if (state.outcome?.cancelled == true) {
+                    // 用户主动取消：中性色、不算“错误”
+                    Text(
+                        stringResource(R.string.state_cancelled),
+                        fontSize = 12.sp,
+                        color = colors.onSurfaceVariant,
                     )
                 }
 
                 Spacer(Modifier.height(4.dp))
                 Text(
-                    "文件只读访问，不申请存储权限",
+                    stringResource(R.string.footer_readonly_note),
                     fontSize = 11.sp,
                     color = colors.onSurfaceVariant,
                 )
@@ -419,6 +435,9 @@ fun LiteScreen(
                     notifyPermissionGranted = notifyGranted,
                     batteryUnrestricted = batteryOk,
                     keepAwake = keepAwake,
+                    themeMode = themeMode,
+                    language = language,
+                    languageEnabled = !state.running,
                     onKeepScreenOn = {
                         keepScreenOn = it
                         appSettings.keepScreenOn = it
@@ -438,6 +457,13 @@ fun LiteScreen(
                         appSettings.keepAwake = value
                         // 打开时若正在跑长任务，立刻补一把唤醒锁（不用等下一次开始）
                         if (value && RunKeeper.active) RunKeeper.refreshWakeLock(context)
+                    },
+                    onThemeMode = { chosen -> onThemeModeChange(chosen) },
+                    onLanguage = { chosen ->
+                        language = chosen
+                        appSettings.language = chosen
+                        // 语言资源要靠 recreate 重载（locale 在 attachBaseContext 里套）
+                        (context as? Activity)?.recreate()
                     },
                     onRequestUnrestricted = { requestBatteryUnrestricted(context) },
                     onClose = { state.showSettings = false },
@@ -461,9 +487,14 @@ private fun Header(
             modifier = Modifier.weight(1f),
             verticalArrangement = Arrangement.spacedBy(4.dp),
         ) {
-            Text("哈希计算", fontSize = 28.sp, fontWeight = FontWeight.Bold)
+            Text(stringResource(R.string.app_name), fontSize = 28.sp, fontWeight = FontWeight.Bold)
+            val hw = HardwareAcceleration.acceleratedCommon(flags, ratios)
             Text(
-                HardwareAcceleration.headerSummary(flags, ratios),
+                if (hw.isEmpty()) {
+                    stringResource(R.string.header_hw_none)
+                } else {
+                    stringResource(R.string.header_hw_enabled, hw.joinToString("/") { it.label })
+                },
                 fontSize = 12.sp,
                 color = colors.onSurfaceVariant,
             )
@@ -522,9 +553,9 @@ private fun FileCard(state: LiteUiState, onPick: () -> Unit, onClear: () -> Unit
                 ) {
                     Text("＋", fontSize = 30.sp, color = colors.primary)
                 }
-                Text("选择文件", fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
+                Text(stringResource(R.string.pick_file), fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
                 Text(
-                    "任意文件 · 只读访问",
+                    stringResource(R.string.pick_file_hint),
                     fontSize = 11.sp,
                     color = colors.onSurfaceVariant,
                 )
@@ -544,13 +575,17 @@ private fun FileCard(state: LiteUiState, onPick: () -> Unit, onClear: () -> Unit
                     overflow = TextOverflow.Ellipsis,
                 )
                 Text(
-                    if (state.fileSize > 0L) HashParse.formatBytes(state.fileSize) else "大小未知",
+                    if (state.fileSize > 0L) HashParse.formatBytes(state.fileSize) else stringResource(R.string.file_size_unknown),
                     fontSize = 12.sp,
                     color = colors.onSurfaceVariant,
                 )
                 Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                    TextButton(onClick = onPick, enabled = !state.running) { Text("更换") }
-                    TextButton(onClick = onClear, enabled = !state.running) { Text("清除") }
+                    TextButton(onClick = onPick, enabled = !state.running) {
+                        Text(stringResource(R.string.action_replace))
+                    }
+                    TextButton(onClick = onClear, enabled = !state.running) {
+                        Text(stringResource(R.string.action_clear))
+                    }
                 }
             }
         }
@@ -566,9 +601,18 @@ private fun AlgorithmPicker(
     val colors = MaterialTheme.colorScheme
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Text("算法", fontSize = 13.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f))
+            Text(
+                stringResource(R.string.section_algorithms),
+                fontSize = 13.sp,
+                fontWeight = FontWeight.SemiBold,
+                modifier = Modifier.weight(1f),
+            )
             if (state.selected.size > 1) {
-                Text("会一次读完、并行算出全部", fontSize = 10.sp, color = colors.onSurfaceVariant)
+                Text(
+                    stringResource(R.string.algorithms_single_pass),
+                    fontSize = 10.sp,
+                    color = colors.onSurfaceVariant,
+                )
             }
         }
 
@@ -597,13 +641,17 @@ private fun AlgorithmPicker(
             )
             Spacer(Modifier.width(8.dp))
             Text(
-                "更多算法（SHA-3 / 国密 / CRC32）",
+                stringResource(R.string.more_algorithms),
                 fontSize = 12.5.sp,
                 fontWeight = FontWeight.Medium,
             )
             if (moreSelected > 0) {
                 Spacer(Modifier.width(6.dp))
-                Text("已选 $moreSelected", fontSize = 11.sp, color = colors.primary)
+                Text(
+                    stringResource(R.string.more_algorithms_selected, moreSelected),
+                    fontSize = 11.sp,
+                    color = colors.primary,
+                )
             }
         }
 
@@ -621,7 +669,7 @@ private fun AlgorithmPicker(
             )
             Spacer(Modifier.width(5.dp))
             Text(
-                "= CPU 硬件指令加速（本机实测判定）；SHA3 由内置 native 库（ARMv8.2-SHA3 汇编）加速，SM3 为软件实现；CRC32 是校验和、非加密哈希",
+                stringResource(R.string.legend_accel),
                 fontSize = 10.sp,
                 lineHeight = 14.sp,
                 color = colors.onSurfaceVariant,
@@ -658,7 +706,7 @@ private fun ChipRows(
                         {
                             Icon(
                                 painter = painterResource(R.drawable.ic_cpu),
-                                contentDescription = "硬件加速",
+                                contentDescription = stringResource(R.string.badge_hardware_accel),
                                 tint = MaterialTheme.colorScheme.primary,
                                 modifier = Modifier.size(15.dp),
                             )
@@ -678,6 +726,7 @@ private fun ChipRows(
 @Composable
 private fun ActionArea(state: LiteUiState, onStart: () -> Unit, onCancel: () -> Unit) {
     val colors = MaterialTheme.colorScheme
+    val context = LocalContext.current
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
         Button(
             onClick = onStart,
@@ -688,7 +737,7 @@ private fun ActionArea(state: LiteUiState, onStart: () -> Unit, onCancel: () -> 
                 .height(54.dp),
         ) {
             Text(
-                if (state.running) "计算中…" else "开始计算",
+                stringResource(if (state.running) R.string.action_computing else R.string.action_start),
                 fontSize = 16.sp,
                 fontWeight = FontWeight.SemiBold,
             )
@@ -706,21 +755,25 @@ private fun ActionArea(state: LiteUiState, onStart: () -> Unit, onCancel: () -> 
                             append(HashParse.formatBytes(progress.doneBytes))
                             if (progress.totalBytes > 0) append(" / ").append(HashParse.formatBytes(progress.totalBytes))
                             append(" · ").append(HashParse.formatSpeed(progress.bytesPerSec))
-                            val eta = HashParse.formatEta(progress.etaSeconds)
+                            val eta = etaText(context, progress.etaSeconds)
                             if (eta.isNotEmpty()) append(" · ").append(eta)
                         },
                         fontSize = 12.sp,
                         color = colors.onSurfaceVariant,
                         modifier = Modifier.weight(1f),
                     )
-                    TextButton(onClick = onCancel) { Text("取消") }
+                    TextButton(onClick = onCancel) { Text(stringResource(R.string.action_cancel)) }
                 }
             }
         }
 
         state.outcome?.takeIf { it.success }?.let { outcome ->
             Text(
-                "完成 · ${HashParse.formatDuration(outcome.elapsedNanos)} · 平均 ${HashParse.formatSpeed(outcome.bytesPerSec)}",
+                stringResource(
+                    R.string.summary_done,
+                    HashParse.formatDuration(outcome.elapsedNanos),
+                    HashParse.formatSpeed(outcome.bytesPerSec),
+                ),
                 fontSize = 12.sp,
                 color = colors.onSurfaceVariant,
             )
@@ -765,8 +818,13 @@ private fun ResultCard(
     ) {
         Column(modifier = Modifier.padding(start = 20.dp, end = 12.dp, top = 12.dp, bottom = 20.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Text("结果", fontSize = 13.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f))
-                Text("大写", fontSize = 11.sp, color = colors.onSurfaceVariant)
+                Text(
+                    stringResource(R.string.section_result),
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    modifier = Modifier.weight(1f),
+                )
+                Text(stringResource(R.string.label_uppercase), fontSize = 11.sp, color = colors.onSurfaceVariant)
                 Spacer(Modifier.width(4.dp))
                 Switch(
                     checked = uppercase,
@@ -778,7 +836,12 @@ private fun ResultCard(
                         "${it.key.label}: ${HashParse.display(it.value, uppercase)}"
                     }
                     onCopy("ALL", text)
-                }) { Text(if (copied == "ALL") "已复制" else "复制全部", fontSize = 12.sp) }
+                }) {
+                    Text(
+                        stringResource(if (copied == "ALL") R.string.action_copied else R.string.action_copy_all),
+                        fontSize = 12.sp,
+                    )
+                }
             }
 
             Column(verticalArrangement = Arrangement.spacedBy(14.dp), modifier = Modifier.padding(end = 8.dp)) {
@@ -808,11 +871,17 @@ private fun ResultCard(
                                     modifier = Modifier.size(11.dp),
                                 )
                                 Spacer(Modifier.width(3.dp))
-                                Text("硬件加速", fontSize = 10.sp, color = colors.primary)
+                                Text(
+                                    stringResource(R.string.badge_hardware_accel),
+                                    fontSize = 10.sp,
+                                    color = colors.primary,
+                                )
                             }
                             Spacer(Modifier.weight(1f))
                             Text(
-                                if (copied == algorithm.label) "已复制" else "点按复制",
+                                stringResource(
+                                    if (copied == algorithm.label) R.string.action_copied else R.string.action_tap_to_copy,
+                                ),
                                 fontSize = 11.sp,
                                 color = if (copied == algorithm.label) colors.primary else colors.onSurfaceVariant,
                             )
@@ -838,7 +907,11 @@ private fun ResultCard(
 private fun CompareCard(state: LiteUiState) {
     val colors = MaterialTheme.colorScheme
     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-        Text("校验", fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+        Text(
+            stringResource(R.string.section_verify),
+            fontSize = 13.sp,
+            fontWeight = FontWeight.SemiBold,
+        )
         OutlinedTextField(
             value = state.compareText,
             onValueChange = { state.compareText = it },
@@ -846,7 +919,7 @@ private fun CompareCard(state: LiteUiState) {
             shape = RoundedCornerShape(16.dp),
             minLines = 2,
             placeholder = {
-                Text("粘贴校验值（md5 / sha1 / sha256 …，大小写与空格都不挑）", fontSize = 12.sp)
+                Text(stringResource(R.string.compare_placeholder), fontSize = 12.sp)
             },
             textStyle = TextStyle(fontSize = 13.sp, fontFamily = FontFamily.Monospace),
         )
@@ -859,7 +932,7 @@ private fun CompareCard(state: LiteUiState) {
             state.compareText.isBlank() -> Unit
 
             expected == null -> Text(
-                "没识别出有效的校验值",
+                stringResource(R.string.compare_invalid),
                 fontSize = 12.sp,
                 color = colors.error,
             )
@@ -867,7 +940,7 @@ private fun CompareCard(state: LiteUiState) {
             else -> {
                 val candidates = HashParse.candidates(expected)
                 Text(
-                    "识别为 " + candidates.joinToString(" / ") { it.label },
+                    stringResource(R.string.compare_recognized, candidates.joinToString(" / ") { it.label }),
                     fontSize = 11.sp,
                     color = colors.onSurfaceVariant,
                 )
@@ -875,7 +948,7 @@ private fun CompareCard(state: LiteUiState) {
                     .filterKeys { it in candidates }
                 when {
                     compared.isEmpty() -> Text(
-                        "勾选上面的算法并计算后即可校验",
+                        stringResource(R.string.compare_need_compute),
                         fontSize = 12.sp,
                         color = colors.onSurfaceVariant,
                     )
@@ -896,7 +969,7 @@ private fun CompareCard(state: LiteUiState) {
                                 Spacer(Modifier.width(12.dp))
                                 Column {
                                     Text(
-                                        if (pass) "校验通过" else "校验不通过",
+                                        stringResource(if (pass) R.string.compare_pass else R.string.compare_fail),
                                         fontSize = 15.sp,
                                         fontWeight = FontWeight.SemiBold,
                                         color = accent,
@@ -913,13 +986,15 @@ private fun CompareCard(state: LiteUiState) {
 }
 
 /** 完成通知里的一句话结果：算法 + 值前缀 + 耗时/速度。 */
-private fun hashSummary(outcome: io.github.xiaokun19.hashlite.core.HashOutcome): String = buildString {
+private fun hashSummary(context: Context, outcome: io.github.xiaokun19.hashlite.core.HashOutcome): String = buildString {
     val first = outcome.hexByAlgorithm.entries.firstOrNull()
     if (first != null) {
         append(first.key.label).append(' ').append(first.value.take(16)).append('…')
-        if (outcome.hexByAlgorithm.size > 1) append("（共 ${outcome.hexByAlgorithm.size} 个算法）")
+        if (outcome.hexByAlgorithm.size > 1) {
+            append(context.getString(R.string.notif_summary_more_algorithms, outcome.hexByAlgorithm.size))
+        }
     } else {
-        append(if (outcome.error != null) outcome.error else "完成")
+        append(outcome.error ?: context.getString(R.string.state_done))
     }
     append(" · ").append(HashParse.formatDuration(outcome.elapsedNanos))
     append(" · ").append(HashParse.formatSpeed(outcome.bytesPerSec))
@@ -934,7 +1009,7 @@ private fun queryName(context: Context, uri: Uri): String {
             }
         }
     }
-    return uri.lastPathSegment ?: "未知文件"
+    return uri.lastPathSegment ?: context.getString(R.string.fallback_unknown_file)
 }
 
 private fun querySize(context: Context, uri: Uri): Long {

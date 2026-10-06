@@ -53,6 +53,8 @@ data class BatchFileResult(
     val expectedAlgorithm: LiteAlgorithm?,
     val verdict: Verdict,
     val error: String? = null,
+    /** 该文件是因为“用户取消”而没算：UI 显示为中性文案，不当错误文案。 */
+    val cancelled: Boolean = false,
     val elapsedNanos: Long = 0L,
     val bytesPerSec: Double = 0.0,
 ) {
@@ -216,6 +218,7 @@ class BatchHasher(
                                 expectedAlgorithm = file.expectedAlgorithm,
                                 verdict = judge(hashed, file),
                                 error = hashed.error,
+                                cancelled = hashed.cancelled,
                                 elapsedNanos = elapsed,
                                 bytesPerSec = if (elapsed > 0L) hashed.totalBytes.toDouble() / (elapsed / 1_000_000_000.0) else 0.0,
                             )
@@ -254,7 +257,7 @@ class BatchHasher(
                 expected = files[index].expected,
                 expectedAlgorithm = files[index].expectedAlgorithm,
                 verdict = Verdict.ERROR,
-                error = "已取消",
+                cancelled = true,
             )
         }
         val doneNames = files.filterIndexed { index, _ -> results[index] != null }.map { it.name }
@@ -270,7 +273,7 @@ class BatchHasher(
     }
 
     private fun judge(hashed: HashOutcome, file: BatchFile): Verdict {
-        if (hashed.error != null) return Verdict.ERROR
+        if (hashed.error != null || hashed.cancelled) return Verdict.ERROR
         val expected = file.expected
         if (expected.isNullOrBlank()) return Verdict.UNLISTED
         val want = expected.trim().lowercase()

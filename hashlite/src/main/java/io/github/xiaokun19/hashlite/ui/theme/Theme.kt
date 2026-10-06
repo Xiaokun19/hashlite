@@ -5,6 +5,8 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.luminance
 
 private val LightColors = lightColorScheme(
     primary = BlueLight,
@@ -46,10 +48,10 @@ fun HashLiteTheme(
     )
 }
 
-/** 校验通过/失败用的强调色（跟随深浅色）。 */
+/** 校验通过/失败用的强调色（跟随**实际生效**的深浅色，而不是系统值——主题可手动覆盖）。 */
 @Composable
-fun verdictColors(pass: Boolean): Pair<androidx.compose.ui.graphics.Color, androidx.compose.ui.graphics.Color> {
-    val dark = isSystemInDarkTheme()
+fun verdictColors(pass: Boolean): Pair<Color, Color> {
+    val dark = MaterialTheme.colorScheme.background.luminance() < 0.5f
     return if (pass) {
         (if (dark) SuccessDark else SuccessLight) to (if (dark) SuccessDark else SuccessLight)
     } else {

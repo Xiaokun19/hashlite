@@ -29,17 +29,20 @@ class HashService : Service() {
 
     private var foregroundStarted = false
 
+    /** 界面语言包装过的 Context（通知文案跟随 App 内选择的语言，而不是系统语言）。 */
+    private val ui: Context get() = AppLocale.wrap(this)
+
     override fun onBind(intent: Intent?): IBinder? = null
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         when (intent?.action) {
             ACTION_START -> {
-                val title = intent.getStringExtra(EXTRA_TITLE) ?: "正在计算哈希"
+                val title = intent.getStringExtra(EXTRA_TITLE) ?: ui.getString(R.string.notif_default_title)
                 startOrUpdate(title, null, null)
             }
 
             ACTION_UPDATE -> {
-                val title = intent.getStringExtra(EXTRA_TITLE) ?: "正在计算哈希"
+                val title = intent.getStringExtra(EXTRA_TITLE) ?: ui.getString(R.string.notif_default_title)
                 val text = intent.getStringExtra(EXTRA_TEXT)
                 val percent = intent.getIntExtra(EXTRA_PERCENT, -1).takeIf { it in 0..100 }
                 startOrUpdate(title, text, percent)
@@ -82,13 +85,13 @@ class HashService : Service() {
         val content = NotificationCompat.Builder(this, CHANNEL_PROGRESS)
             .setSmallIcon(R.drawable.ic_cpu)
             .setContentTitle(title)
-            .setContentText(text ?: "准备中…")
+            .setContentText(text ?: ui.getString(R.string.notif_preparing))
             .setOngoing(true)
             .setOnlyAlertOnce(true)
             .setShowWhen(false)
             .setPriority(NotificationCompat.PRIORITY_LOW)
             .setContentIntent(openAppIntent(this))
-            .addAction(0, "取消", cancelIntent(this))
+            .addAction(0, ui.getString(R.string.notif_cancel_action), cancelIntent(this))
         if (percent != null) {
             content.setProgress(100, percent, false)
         } else {
@@ -112,19 +115,20 @@ class HashService : Service() {
         private const val NOTIF_ONGOING = 1
         private const val NOTIF_RESULT = 2
 
-        /** 渠道建一次即可；Android 8 以下没有渠道概念。 */
+        /** 渠道建一次即可；Android 8 以下没有渠道概念。名称/说明跟随 App 内语言（会更新）。 */
         fun ensureChannels(context: Context) {
             if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return
             val manager = context.getSystemService(NotificationManager::class.java) ?: return
+            val ui = AppLocale.wrap(context)
             manager.createNotificationChannel(
-                NotificationChannel(CHANNEL_PROGRESS, "计算进度", NotificationManager.IMPORTANCE_LOW).apply {
-                    description = "计算期间常驻的进度通知（静音、不可滑掉）"
+                NotificationChannel(CHANNEL_PROGRESS, ui.getString(R.string.notif_channel_progress_name), NotificationManager.IMPORTANCE_LOW).apply {
+                    description = ui.getString(R.string.notif_channel_progress_desc)
                     setShowBadge(false)
                 },
             )
             manager.createNotificationChannel(
-                NotificationChannel(CHANNEL_RESULT, "完成提醒", NotificationManager.IMPORTANCE_DEFAULT).apply {
-                    description = "计算完成、校验不通过等提醒"
+                NotificationChannel(CHANNEL_RESULT, ui.getString(R.string.notif_channel_result_name), NotificationManager.IMPORTANCE_DEFAULT).apply {
+                    description = ui.getString(R.string.notif_channel_result_desc)
                 },
             )
         }

@@ -2,13 +2,29 @@ package io.github.xiaokun19.hashlite
 
 import android.content.Context
 
+/** 深浅色模式：跟随系统 / 浅色 / 深色。 */
+enum class ThemeMode(val pref: String) {
+    SYSTEM("system"),
+    LIGHT("light"),
+    DARK("dark"),
+    ;
+
+    companion object {
+        fun fromPref(value: String?): ThemeMode = entries.firstOrNull { it.pref == value } ?: SYSTEM
+    }
+}
+
 /**
- * 用户设置（SharedPreferences，与"大写开关"共用同一份 prefs 文件）。
+ * 用户设置（SharedPreferences，与“大写开关”共用同一份 prefs 文件）。
  *
- * 三项都与"长任务体验"有关：
+ * 长任务三项：
  * - [keepScreenOn]：计算期间保持屏幕常亮（不用任何权限，只保屏幕不保 CPU 锁）；
  * - [notifyProgress]：计算期间挂**常驻通知**（并拉起前台服务——防杀、防冻结压频）；
  * - [notifyResult]：结束后弹**普通通知**（成功/不匹配/失败）。
+ *
+ * 另两项：
+ * - [keepAwake]：熄屏后继续计算（长任务期间持部分唤醒锁）；
+ * - [themeMode] / [language]：外观与语言（见 [AppLocale]）。
  */
 class AppSettings(context: Context) {
 
@@ -37,12 +53,28 @@ class AppSettings(context: Context) {
         get() = prefs.getBoolean(KEY_KEEP_AWAKE, true)
         set(value) = prefs.edit().putBoolean(KEY_KEEP_AWAKE, value).apply()
 
+    /** 深浅色模式（默认跟随系统）。 */
+    var themeMode: ThemeMode
+        get() = ThemeMode.fromPref(prefs.getString(KEY_THEME_MODE, null))
+        set(value) = prefs.edit().putString(KEY_THEME_MODE, value.pref).apply()
+
+    /** 界面语言："system" / "zh" / "en"（实际生效见 [AppLocale]）。 */
+    var language: String
+        get() = prefs.getString(KEY_LANGUAGE, LANG_SYSTEM) ?: LANG_SYSTEM
+        set(value) = prefs.edit().putString(KEY_LANGUAGE, value).apply()
+
     companion object {
         const val PREFS = "hashlite"
         const val KEY_KEEP_SCREEN_ON = "keepScreenOn"
         const val KEY_NOTIFY_PROGRESS = "notifyProgress"
         const val KEY_NOTIFY_RESULT = "notifyResult"
         const val KEY_KEEP_AWAKE = "keepAwake"
+        const val KEY_THEME_MODE = "themeMode"
+        const val KEY_LANGUAGE = "language"
+
+        const val LANG_SYSTEM = "system"
+        const val LANG_ZH = "zh"
+        const val LANG_EN = "en"
 
         fun of(context: Context): AppSettings = AppSettings(context)
     }

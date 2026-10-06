@@ -2,6 +2,7 @@ package io.github.xiaokun19.hashlite.ui
 
 import android.content.Context
 import android.net.Uri
+import androidx.annotation.StringRes
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
@@ -38,12 +39,15 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.pluralStringResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import io.github.xiaokun19.hashlite.R
 import io.github.xiaokun19.hashlite.RunKeeper
 import io.github.xiaokun19.hashlite.core.AndroidBatchFile
 import io.github.xiaokun19.hashlite.core.BatchFile
@@ -63,9 +67,9 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 /** 顶层页签：单文件 / 批量。 */
-enum class HashMode(val label: String) {
-    SINGLE("单个文件"),
-    BATCH("批量校验"),
+enum class HashMode(@StringRes val labelRes: Int) {
+    SINGLE(R.string.mode_single),
+    BATCH(R.string.mode_batch),
 }
 
 /** 批量模式的状态。 */
@@ -110,23 +114,27 @@ class BatchUiState {
         report = null
         progress = null
         return when {
-            docs.isEmpty() -> "这个目录里没有文件"
-            docs.size >= SafTree.MAX_FILES -> "文件太多，只取前 ${SafTree.MAX_FILES} 个"
+            docs.isEmpty() -> context.getString(R.string.batch_folder_empty)
+            docs.size >= SafTree.MAX_FILES -> context.getString(R.string.batch_folder_too_many, SafTree.MAX_FILES)
             else -> null
         }
     }
 
     /** 选校验文件。 */
     fun loadChecksum(context: Context, uri: Uri): String? {
-        val name = SafTree.queryName(context.contentResolver, uri) ?: "校验文件"
+        val name = SafTree.queryName(context.contentResolver, uri) ?: context.getString(R.string.fallback_checksum_name)
         val parsed = ChecksumFile.parse(SafTree.readText(context.contentResolver, uri), name)
         checksumUri = uri
         checksumName = name
         checksumList = parsed
         report = null
         return when {
-            parsed.entries.isEmpty() -> "没解析出校验值，检查一下文件格式"
-            parsed.badLines.isNotEmpty() -> "有 ${parsed.badLines.size} 行没看懂，已忽略"
+            parsed.entries.isEmpty() -> context.getString(R.string.batch_checksum_empty)
+            parsed.badLines.isNotEmpty() -> context.resources.getQuantityString(
+                R.plurals.ignored_lines,
+                parsed.badLines.size,
+                parsed.badLines.size,
+            )
             else -> null
         }
     }
@@ -211,16 +219,16 @@ fun BatchSection(state: BatchUiState) {
             scope.launch {
                 val text = state.exportText()
                 if (text == null) {
-                    state.error = "没有可导出的结果"
+                    state.error = context.getString(R.string.batch_nothing_to_export)
                     return@launch
                 }
                 val ok = withContext(Dispatchers.IO) { SafTree.writeText(context.contentResolver, uri, text) }
                 if (ok) {
-                    state.copied = "已保存"
+                    state.copied = "SAVED"
                     delay(1600)
-                    if (state.copied == "已保存") state.copied = null
+                    if (state.copied == "SAVED") state.copied = null
                 } else {
-                    state.error = "写入失败（这个位置可能不允许写入）"
+                    state.error = context.getString(R.string.batch_write_failed)
                 }
             }
         }
@@ -258,10 +266,12 @@ fun BatchSection(state: BatchUiState) {
                         state.progress = progress
                         RunKeeper.progress(
                             context,
-                            buildString {
-                                append("已完成 ${progress.filesDone}/${progress.filesTotal} 个文件")
-                                append(" · 聚合 ").append(HashParse.formatSpeed(progress.aggregateBytesPerSec))
-                            },
+                            context.getString(
+                                R.string.notif_batch_progress,
+                                progress.filesDone,
+                                progress.filesTotal,
+                                HashParse.formatSpeed(progress.aggregateBytesPerSec),
+                            ),
                             percent = if (progress.bytesTotal > 0L) (progress.fraction * 100).toInt() else null,
                         )
                     }
@@ -274,26 +284,32 @@ fun BatchSection(state: BatchUiState) {
                 state.report = report
                 state.exportAlgorithm = report.results.firstOrNull()?.primaryAlgorithm
                 val cancelled = report.cancelled
-                if (cancelled) state.error = "已取消（结果不完整）"
                 val hasProblem = report.mismatchedCount > 0 || report.errorCount > 0 || report.missing.isNotEmpty()
                 RunKeeper.end(
                     context,
                     when {
-                        cancelled -> "已取消 · ${state.folderName}"
-                        hasProblem -> "⚠ 有文件没通过 · ${state.folderName}"
-                        else -> "✓ 批量校验完成 · ${state.folderName}"
+                        cancelled -> context.getString(R.string.notif_title_cancelled, state.folderName)
+                        hasProblem -> context.getString(R.string.notif_title_batch_problem, state.folderName)
+                        else -> context.getString(R.string.notif_title_batch_done, state.folderName)
                     },
-                    buildString {
-                        append("匹配 ${report.matchedCount} · 不匹配 ${report.mismatchedCount}")
-                        append(" · 缺失 ${report.missing.size}")
-                        append(" · ").append(HashParse.formatSpeed(report.aggregateBytesPerSec))
-                    },
+                    context.getString(
+                        R.string.notif_batch_result_text,
+                        report.matchedCount,
+                        report.mismatchedCount,
+                        report.missing.size,
+                        HashParse.formatSpeed(report.aggregateBytesPerSec),
+                    ),
                     error = hasProblem && !cancelled,
                     cancelled = cancelled,
                 )
             }.onFailure {
                 state.error = it.message ?: it.toString()
-                RunKeeper.end(context, "✗ 批量校验失败 · ${state.folderName}", it.message ?: "未知错误", error = true)
+                RunKeeper.end(
+                    context,
+                    context.getString(R.string.notif_title_batch_failed, state.folderName),
+                    it.message ?: context.getString(R.string.notif_unknown_error),
+                    error = true,
+                )
             }
         }
     }
@@ -326,18 +342,25 @@ fun BatchSection(state: BatchUiState) {
             )
         }
 
-        state.error?.let { message ->
-            // 用户自己取消的不算"错误"：中性色、不带"提示："前缀
-            val cancelled = message.startsWith("已取消")
+        if (state.report?.cancelled == true) {
+            // 用户主动取消：中性色、不算“错误”
             Text(
-                if (cancelled) message else "提示：$message",
+                stringResource(R.string.batch_cancelled_incomplete),
                 fontSize = 12.sp,
-                color = if (cancelled) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.error,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
+        } else {
+            state.error?.let { message ->
+                Text(
+                    stringResource(R.string.notice_with_message, message),
+                    fontSize = 12.sp,
+                    color = MaterialTheme.colorScheme.error,
+                )
+            }
         }
 
         Text(
-            "批量模式同样不申请存储权限：目录与文件都用 SAF 只读打开",
+            stringResource(R.string.batch_footer_note),
             fontSize = 11.sp,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
@@ -372,8 +395,12 @@ private fun FolderCard(state: BatchUiState, running: Boolean, onPick: () -> Unit
                 ) {
                     Text("＋", fontSize = 28.sp, color = colors.primary)
                 }
-                Text("选择文件夹", fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
-                Text("整目录批量计算 / 校验", fontSize = 11.sp, color = colors.onSurfaceVariant)
+                Text(stringResource(R.string.pick_folder), fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
+                Text(
+                    stringResource(R.string.pick_folder_hint),
+                    fontSize = 11.sp,
+                    color = colors.onSurfaceVariant,
+                )
             }
         } else {
             Column(
@@ -391,15 +418,19 @@ private fun FolderCard(state: BatchUiState, running: Boolean, onPick: () -> Unit
                 )
                 Text(
                     buildString {
-                        append(state.fileCount).append(" 个文件")
+                        append(pluralStringResource(R.plurals.file_count, state.fileCount, state.fileCount))
                         if (state.totalBytes > 0L) append(" · ").append(HashParse.formatBytes(state.totalBytes))
                     },
                     fontSize = 12.sp,
                     color = colors.onSurfaceVariant,
                 )
                 Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                    TextButton(onClick = onPick, enabled = !running) { Text("更换") }
-                    TextButton(onClick = onClear, enabled = !running) { Text("清除") }
+                    TextButton(onClick = onPick, enabled = !running) {
+                        Text(stringResource(R.string.action_replace))
+                    }
+                    TextButton(onClick = onClear, enabled = !running) {
+                        Text(stringResource(R.string.action_clear))
+                    }
                 }
             }
         }
@@ -420,17 +451,23 @@ private fun ChecksumCard(state: BatchUiState, running: Boolean, onPick: () -> Un
                 .padding(20.dp),
             verticalArrangement = Arrangement.spacedBy(6.dp),
         ) {
-            Text("校验文件（可选）", fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+            Text(
+                stringResource(R.string.section_checksum_file),
+                fontSize = 13.sp,
+                fontWeight = FontWeight.SemiBold,
+            )
 
             val list = state.checksumList
             if (list == null) {
                 Text(
-                    "选 .md5 / .sha1 / .sha256 / .sfv 这类旁挂清单，就能直接比对；不选则只算不比",
+                    stringResource(R.string.checksum_hint),
                     fontSize = 11.5.sp,
                     lineHeight = 16.sp,
                     color = colors.onSurfaceVariant,
                 )
-                TextButton(onClick = onPick, enabled = !running) { Text("选择校验文件") }
+                TextButton(onClick = onPick, enabled = !running) {
+                    Text(stringResource(R.string.pick_checksum))
+                }
             } else {
                 Text(
                     state.checksumName,
@@ -439,18 +476,23 @@ private fun ChecksumCard(state: BatchUiState, running: Boolean, onPick: () -> Un
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
+                val entriesText = pluralStringResource(R.plurals.entries_count, list.entries.size, list.entries.size)
                 Text(
                     buildString {
-                        append("${list.entries.size} 条 · ${list.format.displayName}")
+                        append(entriesText).append(" · ").append(list.format.displayName)
                         list.algorithm?.let { append(" · ").append(it.label) }
-                        if (list.hasUnknownAlgorithm) append(" · 有认不出算法的行")
+                        if (list.hasUnknownAlgorithm) append(" · ").append(stringResource(R.string.checksum_unknown_algo))
                     },
                     fontSize = 12.sp,
                     color = colors.onSurfaceVariant,
                 )
                 Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                    TextButton(onClick = onPick, enabled = !running) { Text("更换") }
-                    TextButton(onClick = onClear, enabled = !running) { Text("清除") }
+                    TextButton(onClick = onPick, enabled = !running) {
+                        Text(stringResource(R.string.action_replace))
+                    }
+                    TextButton(onClick = onClear, enabled = !running) {
+                        Text(stringResource(R.string.action_clear))
+                    }
                 }
             }
         }
@@ -464,10 +506,13 @@ private fun ParallelCard(state: BatchUiState) {
     val colors = MaterialTheme.colorScheme
     val cores = remember { Runtime.getRuntime().availableProcessors() }
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        Text("并行度", fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
         Text(
-            "同时算几个文件。单文件的哈希链没法并行，只有并行多个文件才能把总吞吐抬起来" +
-                "（本机 ${cores} 核；默认 2）；想看加速比，就用 1 再跑一遍同一目录",
+            stringResource(R.string.section_parallelism),
+            fontSize = 13.sp,
+            fontWeight = FontWeight.SemiBold,
+        )
+        Text(
+            stringResource(R.string.parallelism_hint, cores),
             fontSize = 11.sp,
             lineHeight = 15.sp,
             color = colors.onSurfaceVariant,
@@ -486,7 +531,11 @@ private fun ParallelCard(state: BatchUiState) {
 
         if (state.checksumList == null) {
             Spacer(Modifier.height(2.dp))
-            Text("算法", fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+            Text(
+                stringResource(R.string.section_algorithms),
+                fontSize = 13.sp,
+                fontWeight = FontWeight.SemiBold,
+            )
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
                 listOf(LiteAlgorithm.MD5, LiteAlgorithm.SHA1, LiteAlgorithm.SHA256).forEach { algorithm ->
                     FilterChip(
@@ -505,6 +554,7 @@ private fun ParallelCard(state: BatchUiState) {
 @Composable
 private fun BatchAction(state: BatchUiState, onStart: () -> Unit, onCancel: () -> Unit) {
     val colors = MaterialTheme.colorScheme
+    val context = LocalContext.current
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
         Button(
             onClick = onStart,
@@ -514,12 +564,17 @@ private fun BatchAction(state: BatchUiState, onStart: () -> Unit, onCancel: () -
                 .fillMaxWidth()
                 .height(54.dp),
         ) {
+            val label = when {
+                state.running -> stringResource(R.string.action_computing)
+                state.checksumList != null -> pluralStringResource(
+                    R.plurals.start_verify_files,
+                    state.fileCount,
+                    state.fileCount,
+                )
+                else -> pluralStringResource(R.plurals.start_hash_files, state.fileCount, state.fileCount)
+            }
             Text(
-                when {
-                    state.running -> "计算中…"
-                    state.checksumList != null -> "开始校验 ${state.fileCount} 个文件"
-                    else -> "开始计算 ${state.fileCount} 个文件"
-                },
+                label,
                 fontSize = 16.sp,
                 fontWeight = FontWeight.SemiBold,
             )
@@ -531,24 +586,34 @@ private fun BatchAction(state: BatchUiState, onStart: () -> Unit, onCancel: () -
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(
                         buildString {
-                            append("${progress.filesDone}/${progress.filesTotal} 个文件")
+                            append(context.getString(R.string.batch_progress_files, progress.filesDone, progress.filesTotal))
                             if (progress.bytesTotal > 0L) {
                                 append(" · ").append(HashParse.formatBytes(progress.bytesDone))
                                 append(" / ").append(HashParse.formatBytes(progress.bytesTotal))
                             }
-                            append(" · 聚合 ").append(HashParse.formatSpeed(progress.aggregateBytesPerSec))
-                            val eta = HashParse.formatEta(progress.etaSeconds)
+                            append(" · ").append(
+                                context.getString(
+                                    R.string.label_aggregate,
+                                    HashParse.formatSpeed(progress.aggregateBytesPerSec),
+                                ),
+                            )
+                            val eta = etaText(context, progress.etaSeconds)
                             if (eta.isNotEmpty()) append(" · ").append(eta)
                         },
                         fontSize = 12.sp,
                         color = colors.onSurfaceVariant,
                         modifier = Modifier.weight(1f),
                     )
-                    TextButton(onClick = onCancel) { Text("取消") }
+                    TextButton(onClick = onCancel) { Text(stringResource(R.string.action_cancel)) }
                 }
                 if (progress.running.isNotEmpty()) {
                     Text(
-                        "正在算：" + progress.running.joinToString("、") { it.substringAfterLast('/') },
+                        context.getString(
+                            R.string.label_running_files,
+                            progress.running.joinToString(context.getString(R.string.list_separator)) {
+                                it.substringAfterLast('/')
+                            },
+                        ),
                         fontSize = 11.sp,
                         maxLines = 2,
                         overflow = TextOverflow.Ellipsis,
@@ -589,11 +654,11 @@ private fun severity(verdict: Verdict): Int = when (verdict) {
     Verdict.UNLISTED -> 3
 }
 
-private fun verdictText(verdict: Verdict): String = when (verdict) {
-    Verdict.MATCH -> "匹配"
-    Verdict.MISMATCH -> "不匹配"
-    Verdict.UNLISTED -> "未列出"
-    Verdict.ERROR -> "读取失败"
+private fun verdictText(context: Context, verdict: Verdict): String = when (verdict) {
+    Verdict.MATCH -> context.getString(R.string.verdict_match)
+    Verdict.MISMATCH -> context.getString(R.string.verdict_mismatch)
+    Verdict.UNLISTED -> context.getString(R.string.verdict_unlisted)
+    Verdict.ERROR -> context.getString(R.string.verdict_error)
 }
 
 private const val VISIBLE_LIMIT = 60
@@ -601,6 +666,8 @@ private const val VISIBLE_LIMIT = 60
 @Composable
 private fun BatchResultCard(state: BatchUiState, report: BatchReport, onCopy: (String, String) -> Unit) {
     val colors = MaterialTheme.colorScheme
+
+    val context = LocalContext.current
     val averagePerFile = report.results.filter { it.bytesPerSec > 0.0 }.map { it.bytesPerSec }.average()
     val problems = report.results.filter { it.verdict == Verdict.MISMATCH || it.verdict == Verdict.ERROR }
     val sorted = report.results.sortedWith(compareBy({ severity(it.verdict) }, { it.name }))
@@ -613,10 +680,20 @@ private fun BatchResultCard(state: BatchUiState, report: BatchReport, onCopy: (S
     ) {
         Column(modifier = Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Text("结果", fontSize = 13.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f))
+                Text(
+                    stringResource(R.string.section_result),
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    modifier = Modifier.weight(1f),
+                )
                 TextButton(onClick = {
-                    onCopy("REPORT", buildReportText(state, report))
-                }) { Text(if (state.copied == "REPORT") "已复制" else "复制报告", fontSize = 12.sp) }
+                    onCopy("REPORT", buildReportText(context, state, report))
+                }) {
+                    Text(
+                        stringResource(if (state.copied == "REPORT") R.string.action_copied else R.string.action_copy_report),
+                        fontSize = 12.sp,
+                    )
+                }
             }
 
             // 结论条：有清单时看"匹配/不匹配/缺失"，没有清单时只说算完了
@@ -636,9 +713,13 @@ private fun BatchResultCard(state: BatchUiState, report: BatchReport, onCopy: (S
                         Column {
                             Text(
                                 when {
-                                    report.allGood -> "全部通过"
-                                    problems.isEmpty() -> "有文件没有对上"
-                                    else -> "${problems.size} 个文件没通过"
+                                    report.allGood -> stringResource(R.string.batch_all_passed)
+                                    problems.isEmpty() -> stringResource(R.string.batch_some_failed)
+                                    else -> pluralStringResource(
+                                        R.plurals.files_failed,
+                                        problems.size,
+                                        problems.size,
+                                    )
                                 },
                                 fontSize = 15.sp,
                                 fontWeight = FontWeight.SemiBold,
@@ -646,11 +727,18 @@ private fun BatchResultCard(state: BatchUiState, report: BatchReport, onCopy: (S
                             )
                             Text(
                                 buildString {
-                                    append("匹配 ${report.matchedCount}")
-                                    append(" · 不匹配 ${report.mismatchedCount}")
-                                    append(" · 缺失 ${report.missing.size}")
-                                    append(" · 未列出 ${report.unlistedCount}")
-                                    if (report.errorCount > 0) append(" · 读取失败 ${report.errorCount}")
+                                    append(
+                                        context.getString(
+                                            R.string.batch_summary_counts,
+                                            report.matchedCount,
+                                            report.mismatchedCount,
+                                            report.missing.size,
+                                            report.unlistedCount,
+                                        ),
+                                    )
+                                    if (report.errorCount > 0) {
+                                        append(context.getString(R.string.batch_summary_error_suffix, report.errorCount))
+                                    }
                                 },
                                 fontSize = 11.sp,
                                 color = colors.onSurfaceVariant,
@@ -663,13 +751,15 @@ private fun BatchResultCard(state: BatchUiState, report: BatchReport, onCopy: (S
             // 吞吐：聚合速度是"并行度有用没用"的直接答案
             Text(
                 buildString {
-                    append("聚合 ").append(HashParse.formatSpeed(report.aggregateBytesPerSec))
-                    append(" · 并行 ").append(report.workers)
+                    append(context.getString(R.string.throughput_aggregate, HashParse.formatSpeed(report.aggregateBytesPerSec)))
+                    append(" · ").append(context.getString(R.string.throughput_workers, report.workers))
                     if (!averagePerFile.isNaN() && averagePerFile > 0.0) {
-                        append(" · 平均每文件 ").append(HashParse.formatSpeed(averagePerFile))
+                        append(" · ").append(
+                            context.getString(R.string.throughput_avg_per_file, HashParse.formatSpeed(averagePerFile)),
+                        )
                     }
-                    append(" · 用时 ").append(HashParse.formatDuration(report.elapsedNanos))
-                    append(" · 共 ").append(HashParse.formatBytes(report.totalBytes))
+                    append(" · ").append(context.getString(R.string.throughput_elapsed, HashParse.formatDuration(report.elapsedNanos)))
+                    append(" · ").append(context.getString(R.string.throughput_total, HashParse.formatBytes(report.totalBytes)))
                 },
                 fontSize = 11.5.sp,
                 lineHeight = 16.sp,
@@ -678,14 +768,23 @@ private fun BatchResultCard(state: BatchUiState, report: BatchReport, onCopy: (S
 
             if (report.unknownSizeFiles > 0) {
                 Text(
-                    "有 ${report.unknownSizeFiles} 个文件报不出大小，进度条按已知字节算",
+                    pluralStringResource(
+                        R.plurals.files_unknown_size,
+                        report.unknownSizeFiles,
+                        report.unknownSizeFiles,
+                    ),
                     fontSize = 11.sp,
                     color = colors.onSurfaceVariant,
                 )
             }
 
             if (report.missing.isNotEmpty()) {
-                Text("缺失（清单里有、目录里没有）", fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = colors.error)
+                Text(
+                    stringResource(R.string.batch_missing_header),
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = colors.error,
+                )
                 report.missing.take(20).forEach { name ->
                     Text("· $name", fontSize = 11.5.sp, color = colors.onSurfaceVariant)
                 }
@@ -697,7 +796,10 @@ private fun BatchResultCard(state: BatchUiState, report: BatchReport, onCopy: (S
 
             if (sorted.size > shown.size) {
                 TextButton(onClick = { state.showAll = true }) {
-                    Text("还有 ${sorted.size - shown.size} 个文件，点这里全部展开", fontSize = 12.sp)
+                    Text(
+                        pluralStringResource(R.plurals.files_more, sorted.size - shown.size, sorted.size - shown.size),
+                        fontSize = 12.sp,
+                    )
                 }
             }
         }
@@ -707,6 +809,7 @@ private fun BatchResultCard(state: BatchUiState, report: BatchReport, onCopy: (S
 @Composable
 private fun BatchResultRow(result: io.github.xiaokun19.hashlite.core.BatchFileResult) {
     val colors = MaterialTheme.colorScheme
+    val context = LocalContext.current
     val accent = when (result.verdict) {
         Verdict.MATCH -> io.github.xiaokun19.hashlite.ui.theme.verdictColors(true).first
         Verdict.MISMATCH, Verdict.ERROR -> io.github.xiaokun19.hashlite.ui.theme.verdictColors(false).first
@@ -733,10 +836,13 @@ private fun BatchResultRow(result: io.github.xiaokun19.hashlite.core.BatchFileRe
             )
             Text(
                 buildString {
-                    append(verdictText(result.verdict))
+                    append(verdictText(context, result.verdict))
                     if (result.size > 0L) append(" · ").append(HashParse.formatBytes(result.size))
                     if (result.bytesPerSec > 0.0) append(" · ").append(HashParse.formatSpeed(result.bytesPerSec))
-                    result.error?.let { append(" · ").append(it) }
+                    when {
+                        result.cancelled -> append(" · ").append(context.getString(R.string.state_cancelled))
+                        else -> result.error?.let { append(" · ").append(it) }
+                    }
                 },
                 fontSize = 11.sp,
                 color = if (result.verdict == Verdict.MISMATCH || result.verdict == Verdict.ERROR) accent else colors.onSurfaceVariant,
@@ -744,7 +850,11 @@ private fun BatchResultRow(result: io.github.xiaokun19.hashlite.core.BatchFileRe
             val hex = result.primaryHex
             if (hex != null) {
                 Text(
-                    if (result.verdict == Verdict.MISMATCH) "实际 ${hex.take(20)}…" else hex,
+                    if (result.verdict == Verdict.MISMATCH) {
+                        context.getString(R.string.batch_actual_hex, hex.take(20))
+                    } else {
+                        hex
+                    },
                     fontSize = 10.5.sp,
                     fontFamily = FontFamily.Monospace,
                     color = colors.onSurfaceVariant,
@@ -755,7 +865,7 @@ private fun BatchResultRow(result: io.github.xiaokun19.hashlite.core.BatchFileRe
             if (result.verdict == Verdict.MISMATCH) {
                 result.expected?.let {
                     Text(
-                        "期望 ${it.take(20)}…",
+                        context.getString(R.string.batch_expected_hex, it.take(20)),
                         fontSize = 10.5.sp,
                         fontFamily = FontFamily.Monospace,
                         color = colors.onSurfaceVariant,
@@ -776,6 +886,7 @@ private fun ExportCard(
     onCopy: (String) -> Unit,
 ) {
     val colors = MaterialTheme.colorScheme
+    val context = LocalContext.current
     val algorithms = state.exportableAlgorithms()
     val text = state.exportText()
 
@@ -785,9 +896,13 @@ private fun ExportCard(
         colors = CardDefaults.cardColors(containerColor = colors.surfaceVariant.copy(alpha = 0.30f)),
     ) {
         Column(modifier = Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            Text("导出校验文件", fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
             Text(
-                "把这次算出来的哈希写成清单文件，以后再校验/分享给别人都用同一份格式",
+                stringResource(R.string.section_export),
+                fontSize = 13.sp,
+                fontWeight = FontWeight.SemiBold,
+            )
+            Text(
+                stringResource(R.string.export_hint),
                 fontSize = 11.5.sp,
                 lineHeight = 16.sp,
                 color = colors.onSurfaceVariant,
@@ -806,7 +921,7 @@ private fun ExportCard(
                 }
             }
 
-            Text("格式", fontSize = 12.sp, fontWeight = FontWeight.Medium)
+            Text(stringResource(R.string.label_format), fontSize = 12.sp, fontWeight = FontWeight.Medium)
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
                 ChecksumFormat.entries.forEach { format ->
                     FilterChip(
@@ -826,11 +941,18 @@ private fun ExportCard(
 
             val sfvMismatch = state.exportFormat == ChecksumFormat.SFV && state.exportAlgorithm != LiteAlgorithm.CRC32
             if (sfvMismatch) {
-                Text("SFV 只支持 CRC32：请把并行度那里的清单算法换成 CRC32，或改选其它格式", fontSize = 11.sp, color = colors.error)
+                Text(
+                    stringResource(R.string.export_sfv_warning),
+                    fontSize = 11.sp,
+                    color = colors.error,
+                )
             }
 
             Text(
-                "预览：${text?.lineSequence()?.take(2)?.joinToString(" / ")?.take(80) ?: "—"}",
+                context.getString(
+                    R.string.export_preview,
+                    text?.lineSequence()?.take(2)?.joinToString(" / ")?.take(80) ?: "—",
+                ),
                 fontSize = 10.5.sp,
                 fontFamily = FontFamily.Monospace,
                 color = colors.onSurfaceVariant,
@@ -843,13 +965,26 @@ private fun ExportCard(
                     onClick = onExport,
                     enabled = text != null && !sfvMismatch && !state.running,
                     shape = RoundedCornerShape(14.dp),
-                ) { Text(if (state.copied == "已保存") "已保存" else "保存文件", fontSize = 13.sp) }
+                ) {
+                    Text(
+                        stringResource(if (state.copied == "SAVED") R.string.state_saved else R.string.action_save_file),
+                        fontSize = 13.sp,
+                    )
+                }
                 TextButton(onClick = { text?.let(onCopy) }, enabled = text != null) {
-                    Text(if (state.copied == "TEXT") "已复制" else "复制文本", fontSize = 13.sp)
+                    Text(
+                        stringResource(if (state.copied == "TEXT") R.string.action_copied else R.string.action_copy_text),
+                        fontSize = 13.sp,
+                    )
                 }
             }
             Text(
-                "默认文件名 ${state.suggestedExportName()} · 共 ${report.results.size} 条",
+                pluralStringResource(
+                    R.plurals.export_default_name,
+                    report.results.size,
+                    state.suggestedExportName(),
+                    report.results.size,
+                ),
                 fontSize = 10.5.sp,
                 color = colors.onSurfaceVariant,
             )
@@ -858,24 +993,38 @@ private fun ExportCard(
 }
 
 /** 结果卡上的"复制报告"：给排查用的一行一文件文本。 */
-private fun buildReportText(state: BatchUiState, report: BatchReport): String = buildString {
-    appendLine("批量哈希报告")
-    appendLine("目录：${state.folderName}（${state.fileCount} 个文件）")
-    state.checksumList?.let { appendLine("清单：${state.checksumName} · ${it.entries.size} 条 · ${it.format.displayName}") }
-    appendLine("并行度：${report.workers}")
-    appendLine("聚合速度：${HashParse.formatSpeed(report.aggregateBytesPerSec)} · 用时 ${HashParse.formatDuration(report.elapsedNanos)}")
+private fun buildReportText(context: Context, state: BatchUiState, report: BatchReport): String = buildString {
+    appendLine(context.getString(R.string.report_title))
+    appendLine(context.getString(R.string.report_folder, state.folderName, state.fileCount))
+    state.checksumList?.let {
+        appendLine(context.getString(R.string.report_checksum, state.checksumName, it.entries.size, it.format.displayName))
+    }
+    appendLine(context.getString(R.string.report_workers, report.workers))
     appendLine(
-        "匹配 ${report.matchedCount} / 不匹配 ${report.mismatchedCount} / 缺失 ${report.missing.size} / " +
-            "未列出 ${report.unlistedCount} / 读取失败 ${report.errorCount}",
+        context.getString(
+            R.string.report_speed,
+            HashParse.formatSpeed(report.aggregateBytesPerSec),
+            HashParse.formatDuration(report.elapsedNanos),
+        ),
+    )
+    appendLine(
+        context.getString(
+            R.string.report_verdicts,
+            report.matchedCount,
+            report.mismatchedCount,
+            report.missing.size,
+            report.unlistedCount,
+            report.errorCount,
+        ),
     )
     appendLine()
     for (result in report.results.sortedWith(compareBy({ severity(it.verdict) }, { it.name }))) {
-        append(verdictText(result.verdict)).append('\t').append(result.name).append('\t')
+        append(verdictText(context, result.verdict)).append('\t').append(result.name).append('\t')
         append(result.primaryHex ?: "-")
         result.error?.let { append("\t").append(it) }
         appendLine()
     }
-    for (name in report.missing) appendLine("缺失\t$name")
+    for (name in report.missing) appendLine(context.getString(R.string.report_missing_line, name))
 }
 
 /** 顶层页签：单个文件 / 批量校验。 */
@@ -902,7 +1051,7 @@ fun ModeSwitcher(mode: HashMode, onSelect: (HashMode) -> Unit) {
                 contentAlignment = Alignment.Center,
             ) {
                 Text(
-                    entry.label,
+                    stringResource(entry.labelRes),
                     fontSize = 13.5.sp,
                     fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
                     color = if (selected) colors.primary else colors.onSurfaceVariant,

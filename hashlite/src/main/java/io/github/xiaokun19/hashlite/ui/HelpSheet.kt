@@ -24,16 +24,19 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import io.github.xiaokun19.hashlite.R
 
 /**
  * 帮助页：从底部升起的说明面板。
  *
- * 内容分三层：为什么要用哈希 → 这几个算法是什么 → 硬件加速到底意味着什么。
- * 速度数字全部取自本机实测（见仓库 README 的测量表），不写宣传口径。
+ * 内容分四层：为什么要用哈希 → 这些算法分别是什么 → 硬件加速是什么意思 →
+ * 长任务与通知 → 本应用的取舍。速度数字全部取自本机实测（见仓库 README 的测量表），
+ * 标注了“随频率档位浮动”，不写宣传口径。
  */
 @Composable
 fun HelpSheet(onClose: () -> Unit, modifier: Modifier = Modifier) {
@@ -68,11 +71,17 @@ fun HelpSheet(onClose: () -> Unit, modifier: Modifier = Modifier) {
                     .padding(start = 20.dp, end = 12.dp, top = 10.dp, bottom = 4.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                Text("帮助", fontSize = 18.sp, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
-                TextButton(onClick = onClose) { Text("关闭") }
+                Text(
+                    stringResource(R.string.help_title),
+                    fontSize = 18.sp,
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier.weight(1f),
+                )
+                TextButton(onClick = onClose) { Text(stringResource(R.string.action_close)) }
             }
 
             // 关键：滚动区必须有"有界高度"（weight(1f)），否则 verticalScroll 的量算会跑偏。
+            // navigationBarsPadding：三键导航栏出现时，底部文字不会被挡住。
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -82,44 +91,84 @@ fun HelpSheet(onClose: () -> Unit, modifier: Modifier = Modifier) {
                     .padding(start = 20.dp, end = 20.dp, bottom = 28.dp),
                 verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
-                Section("哈希是干什么的")
-                Body("哈希就是把任意大小的文件压成一串固定长度的“指纹”。同一个文件永远算出同一个值；" +
-                    "改动一个字节，指纹就面目全非；反过来，拿到指纹也推不出文件内容。")
-                Bullet("校验完整性", "下载、拷贝、备份之后，和发布方给的指纹比对一下，就能确认文件没传坏、没被篡改。")
-                Bullet("判断是否相同", "两台设备上不用搬运文件，比指纹就知道是不是同一份内容。")
-                Bullet("留档与取证", "记下某时刻的指纹，日后可以证明这份文件“没变过”。")
-                Bullet("去重", "把指纹当文件的身份证，重复内容一眼就能认出来。")
+                Section(stringResource(R.string.help_why_title))
+                Body(stringResource(R.string.help_why_intro))
+                Bullet(
+                    stringResource(R.string.help_why_integrity_title),
+                    stringResource(R.string.help_why_integrity_body),
+                )
+                Bullet(
+                    stringResource(R.string.help_why_compare_title),
+                    stringResource(R.string.help_why_compare_body),
+                )
+                Bullet(
+                    stringResource(R.string.help_why_archive_title),
+                    stringResource(R.string.help_why_archive_body),
+                )
+                Bullet(
+                    stringResource(R.string.help_why_dedupe_title),
+                    stringResource(R.string.help_why_dedupe_body),
+                )
 
-                Section("这几个算法分别是什么")
-                Body("它们都是公开的标准算法，安全性来自“单向”和“抗碰撞”，而不是保密。")
-                MetricRow("MD5", "128 位", "老算法、很快；但已被证明能人为构造碰撞，只用来兼容旧校验值")
-                MetricRow("SHA-1", "160 位", "同样已被实际攻破（2017 年 SHAttered），新场景不要用")
-                MetricRow("SHA-256", "256 位", "目前最通用、最稳妥的默认选择")
-                MetricRow("SHA-224 / 384 / 512", "224–512 位", "SHA-2 家族的不同档位；512 内部用 64 位字，结构不同")
-                Body("所谓“碰撞”，就是两个不同的文件算出同一个指纹。能做碰撞不等于能反推文件内容，" +
-                    "但对“防篡改”这个用途来说，已经足够致命。")
+                Section(stringResource(R.string.help_algos_title))
+                Body(stringResource(R.string.help_algos_intro))
+                MetricRow("MD5", stringResource(R.string.unit_bits, "128"), stringResource(R.string.help_algo_md5_note))
+                MetricRow("SHA-1", stringResource(R.string.unit_bits, "160"), stringResource(R.string.help_algo_sha1_note))
+                MetricRow("SHA-256", stringResource(R.string.unit_bits, "256"), stringResource(R.string.help_algo_sha256_note))
+                MetricRow(
+                    "SHA-224 / 384 / 512",
+                    stringResource(R.string.unit_bits, "224–512"),
+                    stringResource(R.string.help_algo_sha2_note),
+                )
+                MetricRow(
+                    "SHA3-256 / SHA3-512",
+                    stringResource(R.string.unit_bits, "256 / 512"),
+                    stringResource(R.string.help_algo_sha3_note),
+                )
+                MetricRow("SM3", stringResource(R.string.unit_bits, "256"), stringResource(R.string.help_algo_sm3_note))
+                MetricRow("CRC32", stringResource(R.string.unit_bits, "32"), stringResource(R.string.help_algo_crc32_note))
+                Body(stringResource(R.string.help_collision_body))
 
-                Section("硬件加速是什么意思")
-                Body("现代 CPU（ARM）里专门加了几条“算哈希”的指令。本机检测到 SHA-1 / SHA-2 的指令扩展，" +
-                    "系统自带的加密库会在运行时自动切到指令实现，而不是用普通指令一条条去算。")
-                Body("本机实测（内存基准，已剔除磁盘因素）：")
-                MetricRow("SHA-256", "≈ 2.7 GB/s", "硬件指令")
-                MetricRow("SHA-1", "≈ 2.6 GB/s", "硬件指令")
-                MetricRow("SHA-512", "≈ 1.7 GB/s", "硬件指令")
-                MetricRow("SHA3-256", "≈ 0.28 GB/s", "无指令、纯软件（本应用未收录）")
-                Body("意义：1 GB 文件用 SHA-256 大约 0.4 秒；如果只能走纯软件实现，会慢一个数量级——" +
-                    "大文件校验和批量校验基本就不可行了。指令路径还更省电、发热更少。")
-                Body("哪些没有加速：芯片厂商只给最常用的算法做指令。SHA-3 / Keccak 在 Android 平台上" +
-                    "连库都没有，谈不上加速，所以本应用只带上面这些算法——它们全都能吃到硬件加速。")
+                Section(stringResource(R.string.help_hw_title))
+                Body(stringResource(R.string.help_hw_intro))
+                Body(stringResource(R.string.help_hw_bench_intro))
+                MetricRow("SHA-256", "≈ 1.5–2.7 GB/s", stringResource(R.string.help_hw_note_native))
+                MetricRow("SHA-1", "≈ 1.2–2.6 GB/s", stringResource(R.string.help_hw_note_native))
+                MetricRow("SHA-512", "≈ 1.0–1.7 GB/s", stringResource(R.string.help_hw_note_native))
+                MetricRow(
+                    "SHA3-256",
+                    stringResource(R.string.help_hw_sha3_value),
+                    stringResource(R.string.help_hw_sha3_note),
+                )
+                Body(stringResource(R.string.help_hw_meaning))
+                Body(stringResource(R.string.help_hw_not_accel))
 
-                Section("本应用的几个取舍")
-                Bullet("默认只勾 SHA-256", "够用，而且是最快的一档。")
-                Bullet("保留 MD5 / SHA-1", "唯一理由是老网站、老文档只提供它们的值——要能比对，就得算得出来。")
-                Bullet("校验不区分大小写", "十六进制 A–F 的大小写只是书写习惯，同一个字节的两种写法，比对时会统一处理。")
+                Section(stringResource(R.string.help_tasks_title))
+                Body(stringResource(R.string.help_tasks_1))
+                Body(stringResource(R.string.help_tasks_2))
+                Body(stringResource(R.string.help_tasks_3))
+
+                Section(stringResource(R.string.help_tradeoffs_title))
+                Bullet(
+                    stringResource(R.string.help_tradeoff_default_title),
+                    stringResource(R.string.help_tradeoff_default_body),
+                )
+                Bullet(
+                    stringResource(R.string.help_tradeoff_legacy_title),
+                    stringResource(R.string.help_tradeoff_legacy_body),
+                )
+                Bullet(
+                    stringResource(R.string.help_tradeoff_case_title),
+                    stringResource(R.string.help_tradeoff_case_body),
+                )
+                Bullet(
+                    stringResource(R.string.help_tradeoff_parallel_title),
+                    stringResource(R.string.help_tradeoff_parallel_body),
+                )
 
                 Spacer(Modifier.height(4.dp))
                 Text(
-                    "以上速度数据来自本机实测（型号相关）；换机器会不同，但“硬件指令 ≫ 纯软件”的结论不变。",
+                    stringResource(R.string.help_footer),
                     fontSize = 10.sp,
                     color = colors.onSurfaceVariant,
                 )

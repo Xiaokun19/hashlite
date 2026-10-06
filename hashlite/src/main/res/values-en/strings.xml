@@ -1,0 +1,271 @@
+<resources>
+    <string name="app_name">HashLite</string>
+
+    <!-- ============ Header / tabs ============ -->
+    <string name="header_hw_none">No hardware hash instructions detected</string>
+    <string name="header_hw_enabled">Hardware instructions active: %1$s</string>
+    <string name="mode_single">Single file</string>
+    <string name="mode_batch">Batch verify</string>
+
+    <!-- ============ File card ============ -->
+    <string name="pick_file">Choose file</string>
+    <string name="pick_file_hint">Any file · read-only</string>
+    <string name="file_size_unknown">Size unknown</string>
+    <string name="action_replace">Replace</string>
+    <string name="action_clear">Clear</string>
+    <string name="fallback_shared_file">Shared file</string>
+    <string name="fallback_unknown_file">Unknown file</string>
+
+    <!-- ============ Algorithm picker ============ -->
+    <string name="section_algorithms">Algorithms</string>
+    <string name="algorithms_single_pass">Computed in one pass, all at once</string>
+    <string name="more_algorithms">More algorithms (SHA-3 / SM3 / CRC32)</string>
+    <string name="more_algorithms_selected">%1$d selected</string>
+    <string name="legend_accel">= CPU hardware instructions (verified on this device); SHA-3 uses the bundled assembly (ARMv8.2-SHA3); SM3 is software-only; CRC32 is a checksum, not a cryptographic hash</string>
+
+    <!-- ============ Actions / progress / result ============ -->
+    <string name="action_start">Start</string>
+    <string name="action_computing">Computing…</string>
+    <string name="action_cancel">Cancel</string>
+    <string name="summary_done">Done · %1$s · avg %2$s</string>
+    <string name="eta_seconds">≈ %1$d s</string>
+    <string name="eta_minutes_seconds">≈ %1$d min %2$02d s</string>
+    <string name="section_result">Result</string>
+    <string name="label_uppercase">Uppercase</string>
+    <string name="action_copy_all">Copy all</string>
+    <string name="action_copied">Copied</string>
+    <string name="action_tap_to_copy">Tap to copy</string>
+    <string name="badge_hardware_accel">Hardware accel.</string>
+
+    <!-- ============ Verify card ============ -->
+    <string name="section_verify">Verify</string>
+    <string name="compare_placeholder">Paste a checksum (md5 / sha1 / sha256 …; case and spaces ignored)</string>
+    <string name="compare_invalid">No valid checksum found</string>
+    <string name="compare_recognized">Detected as %1$s</string>
+    <string name="compare_need_compute">Select the matching algorithm above and run to verify</string>
+    <string name="compare_pass">Verified</string>
+    <string name="compare_fail">Mismatch</string>
+
+    <!-- ============ Common states / errors ============ -->
+    <string name="state_cancelled">Cancelled</string>
+    <string name="state_saved">Saved</string>
+    <string name="error_with_message">Error: %1$s</string>
+    <string name="notice_with_message">Note: %1$s</string>
+    <string name="error_cannot_read_file">Can’t read this file. If it was shared in, the permission may have expired — use “Replace” to pick it again.</string>
+    <string name="footer_readonly_note">Read-only access; no storage permission required</string>
+    <string name="list_separator">, </string>
+    <string name="unit_bits">%1$s-bit</string>
+    <string name="state_done">Done</string>
+
+    <!-- ============ Notifications (single file) ============ -->
+    <string name="notif_title_done">✓ Hash complete · %1$s</string>
+    <string name="notif_title_failed">✗ Hash failed · %1$s</string>
+    <string name="notif_title_cancelled">Cancelled · %1$s</string>
+    <string name="notif_text_cancelled">Computation cancelled</string>
+    <string name="notif_unknown_error">Unknown error</string>
+    <string name="notif_summary_more_algorithms"> (%1$d algorithms)</string>
+
+    <!-- ============ Batch: folder / checksum ============ -->
+    <string name="batch_folder_empty">No files in this folder</string>
+    <string name="batch_folder_too_many">Too many files — taking the first %1$d</string>
+    <string name="fallback_checksum_name">Checksum file</string>
+    <string name="batch_checksum_empty">No checksums parsed — check the file format</string>
+    <string name="pick_folder">Choose folder</string>
+    <string name="pick_folder_hint">Hash / verify a whole folder</string>
+    <string name="section_checksum_file">Checksum file (optional)</string>
+    <string name="checksum_hint">Pick a sidecar list (.md5 / .sha1 / .sha256 / .sfv) to verify directly; without one, files are hashed only</string>
+    <string name="pick_checksum">Choose checksum file</string>
+    <string name="checksum_unknown_algo">some lines have unknown algorithms</string>
+
+    <!-- ============ Batch: parallelism / actions ============ -->
+    <string name="section_parallelism">Parallelism</string>
+    <string name="parallelism_hint">How many files to hash at once. A single file’s hash chain cannot be parallelized; hashing several files at once is the only way to raise total throughput (this device: %1$d cores; default 2). To see the speed-up, rerun the same folder with 1.</string>
+    <string name="batch_progress_files">%1$d/%2$d files</string>
+    <string name="label_aggregate">aggregate %1$s</string>
+    <string name="label_running_files">Hashing: %1$s</string>
+
+    <!-- ============ Batch: results ============ -->
+    <string name="verdict_match">Match</string>
+    <string name="verdict_mismatch">Mismatch</string>
+    <string name="verdict_unlisted">Not listed</string>
+    <string name="verdict_error">Read failed</string>
+    <string name="action_copy_report">Copy report</string>
+    <string name="batch_all_passed">All passed</string>
+    <string name="batch_some_failed">Some files did not match</string>
+    <string name="batch_summary_counts">Matched %1$d · Mismatch %2$d · Missing %3$d · Not listed %4$d</string>
+    <string name="batch_summary_error_suffix"> · Read failed %1$d</string>
+    <string name="throughput_aggregate">aggregate %1$s</string>
+    <string name="throughput_workers">workers %1$d</string>
+    <string name="throughput_avg_per_file">avg per file %1$s</string>
+    <string name="throughput_elapsed">elapsed %1$s</string>
+    <string name="throughput_total">total %1$s</string>
+    <string name="batch_missing_header">Missing (listed but not in the folder)</string>
+    <string name="batch_actual_hex">actual %1$s…</string>
+    <string name="batch_expected_hex">expected %1$s…</string>
+    <string name="batch_nothing_to_export">Nothing to export</string>
+    <string name="batch_write_failed">Write failed (this location may be read-only)</string>
+    <string name="batch_cancelled_incomplete">Cancelled (results incomplete)</string>
+    <string name="batch_footer_note">Batch mode also needs no storage permission — folders and files are opened read-only via SAF</string>
+
+    <!-- ============ Batch: export ============ -->
+    <string name="section_export">Export checksum file</string>
+    <string name="export_hint">Write this run’s hashes to a checksum list — reuse or share the same format later</string>
+    <string name="label_format">Format</string>
+    <string name="export_sfv_warning">SFV only supports CRC32 — recompute with CRC32, or pick another format</string>
+    <string name="export_preview">Preview: %1$s</string>
+    <string name="action_save_file">Save file</string>
+    <string name="action_copy_text">Copy text</string>
+
+    <!-- ============ Batch: notifications ============ -->
+    <string name="notif_batch_progress">Done %1$d/%2$d files · aggregate %3$s</string>
+    <string name="notif_title_batch_done">✓ Batch verify complete · %1$s</string>
+    <string name="notif_title_batch_problem">⚠ Some files failed · %1$s</string>
+    <string name="notif_title_batch_failed">✗ Batch verify failed · %1$s</string>
+    <string name="notif_batch_result_text">Matched %1$d · Mismatch %2$d · Missing %3$d · %4$s</string>
+
+    <!-- ============ Batch: copied report ============ -->
+    <string name="report_title">Batch hash report</string>
+    <string name="report_folder">Folder: %1$s (%2$d files)</string>
+    <string name="report_checksum">List: %1$s · %2$d entries · %3$s</string>
+    <string name="report_workers">Workers: %1$d</string>
+    <string name="report_speed">Aggregate: %1$s · elapsed %2$s</string>
+    <string name="report_verdicts">Match %1$d / Mismatch %2$d / Missing %3$d / Not listed %4$d / Read failed %5$d</string>
+    <string name="report_missing_line">Missing\t%1$s</string>
+
+    <!-- ============ Settings: appearance & language ============ -->
+    <string name="settings_title">Settings</string>
+    <string name="action_close">Close</string>
+    <string name="settings_section_appearance">Appearance &amp; language</string>
+    <string name="settings_theme">Theme</string>
+    <string name="settings_theme_hint">Follows the system by default; can be pinned to light or dark</string>
+    <string name="theme_system">Follow system</string>
+    <string name="theme_light">Light</string>
+    <string name="theme_dark">Dark</string>
+    <string name="settings_language">Language</string>
+    <string name="settings_language_hint">Applies immediately; not available while computing</string>
+    <string name="lang_system">Follow system</string>
+
+    <!-- ============ Settings: computing ============ -->
+    <string name="settings_section_compute">Computing</string>
+    <string name="settings_keep_screen_on">Keep the screen on while computing</string>
+    <string name="settings_keep_screen_on_sub">No permission needed. It only blocks auto screen-off — pressing the power button still works (see the next two items).</string>
+    <string name="settings_notify_progress">Persistent notification (progress / cancel)</string>
+    <string name="settings_notify_progress_sub">Long tasks show progress and offer one-tap cancel (via a foreground service); it also lowers the chance of being frozen. On this ROM, freezing can still happen after the screen goes off — hence the next two fallbacks.</string>
+    <string name="settings_notify_perm_warning">\n⚠ Notification permission not granted: the notification will not appear in the shade (the service still runs)</string>
+    <string name="settings_notify_result">Notify when done</string>
+    <string name="settings_notify_result_sub">One alert on success / mismatch / failure; tap to return to the app</string>
+    <string name="settings_keep_awake">Keep computing with the screen off (wake lock)</string>
+    <string name="settings_keep_awake_sub">Holds a partial wake lock for long tasks (CPU stays awake). Not guaranteed to beat this ROM’s freeze-on-screen-off behavior; a last-resort safeguard, at a small battery cost.</string>
+    <string name="settings_battery">Unrestricted battery usage</string>
+    <string name="settings_battery_on">Whitelisted: less likely to be frozen (this ROM is aggressive; not a 100% guarantee)</string>
+    <string name="settings_battery_off">Not whitelisted: it may be frozen while the screen is off / in the background (even the foreground service gets frozen in our tests) — adding the whitelist is recommended</string>
+    <string name="action_go_settings">Open settings</string>
+
+    <!-- ============ Settings: about ============ -->
+    <string name="settings_section_about">About</string>
+    <string name="about_version">Version</string>
+    <string name="about_package">Package</string>
+    <string name="about_sha3">SHA3 implementation</string>
+    <string name="impl_native">native (bundled assembly)</string>
+    <string name="impl_bouncy">BouncyCastle (software)</string>
+    <string name="about_permissions">Permissions</string>
+    <string name="about_permissions_value">No storage permission; files are read via SAF</string>
+    <string name="about_channels">Notification channels</string>
+    <string name="about_channels_value">%1$s (progress · silent) / %2$s (alerts)</string>
+
+    <!-- ============ Help ============ -->
+    <string name="help_title">Help</string>
+    <string name="help_why_title">What hashing is for</string>
+    <string name="help_why_intro">A hash squeezes a file of any size into a fixed-length “fingerprint”. The same file always yields the same value; change one byte and the fingerprint changes completely; and the fingerprint can’t be turned back into the file.</string>
+    <string name="help_why_integrity_title">Verify integrity</string>
+    <string name="help_why_integrity_body">After downloading, copying or backing up, compare against the fingerprint published by the source to confirm the file wasn’t corrupted or tampered with.</string>
+    <string name="help_why_compare_title">Tell if two things are identical</string>
+    <string name="help_why_compare_body">Two devices can compare fingerprints to know they hold the same content — without transferring the file.</string>
+    <string name="help_why_archive_title">Archive and forensics</string>
+    <string name="help_why_archive_body">Record a fingerprint at some moment; later you can prove the file hasn’t changed since.</string>
+    <string name="help_why_dedupe_title">Deduplicate</string>
+    <string name="help_why_dedupe_body">Treat the fingerprint as the file’s ID card — duplicates are spotted at a glance.</string>
+
+    <string name="help_algos_title">About these algorithms</string>
+    <string name="help_algos_intro">They are all public standards; their security comes from being one-way and collision-resistant, not from secrecy.</string>
+    <string name="help_algo_md5_note">Old and fast; but deliberate collisions have been demonstrated — kept only for compatibility with legacy checksums</string>
+    <string name="help_algo_sha1_note">Also broken in practice (SHAttered, 2017) — don’t use it for new work</string>
+    <string name="help_algo_sha256_note">The most common, safest choice today</string>
+    <string name="help_algo_sha2_note">Different grades of the SHA-2 family; SHA-512 uses 64-bit words internally, so its structure differs</string>
+    <string name="help_algo_sha3_note">The newer standard (Keccak); this app bundles an ARMv8.2 assembly implementation, ≈0.7–1.0 GB/s (≈0.3 GB/s when falling back to software)</string>
+    <string name="help_algo_sm3_note">Chinese national standard with strength similar to SHA-256; software-only in this app (no instruction path)</string>
+    <string name="help_algo_crc32_note">An error-detection checksum (common in .sfv lists); not a cryptographic hash — it can be forged</string>
+    <string name="help_collision_body">A “collision” means two different files producing the same fingerprint. Being able to construct collisions doesn’t mean the file can be reversed — but for anti-tampering purposes it is fatal enough.</string>
+
+    <string name="help_hw_title">What hardware acceleration means</string>
+    <string name="help_hw_intro">Modern ARM CPUs carry dedicated hashing instructions. This app checks two things — whether the CPU has the instruction, and whether the implementation actually uses it (measured) — and only then lights the CPU badge.</string>
+    <string name="help_hw_bench_intro">Measured on this device (memory benchmark, disk excluded):</string>
+    <string name="help_hw_note_native">hardware instructions</string>
+    <string name="help_hw_sha3_value">≈0.7–1.0 GB/s</string>
+    <string name="help_hw_sha3_note">bundled assembly (EOR3); ≈0.3 GB/s if it falls back to software</string>
+    <string name="help_hw_meaning">In practice: a 1 GB file takes roughly 0.4–0.7 s with SHA-256. A software-only implementation is about an order of magnitude slower, which would make large-file and batch verification impractical. The instruction path also draws less power and runs cooler.</string>
+    <string name="help_hw_not_accel">What isn’t accelerated: SM3 runs in pure software; SHA-3 has no system library, so the app carries its own ARMv8.2 assembly and falls back to software when unavailable — slower rather than wrong. CRC32 uses the platform’s native implementation and is very fast; it is a checksum, not a cryptographic hash.</string>
+
+    <string name="help_tasks_title">Long tasks and notifications</string>
+    <string name="help_tasks_1">A “long task” (≥64 MB) shows a persistent notification (a foreground service): harder to kill, harder to throttle, one-tap cancel. Small files won’t bother you.</string>
+    <string name="help_tasks_2">Auto screen-off is blocked while computing by default. If you lock the screen manually, this ROM may still freeze the computation (in our tests, neither the foreground service nor the wake lock was exempt) — the switches in Settings and the battery whitelist are mitigations, not a cure.</string>
+    <string name="help_tasks_3">The “done” alert only fires when the app is not in the foreground; cancelling yourself is not a failure and won’t notify.</string>
+
+    <string name="help_tradeoffs_title">Design choices in this app</string>
+    <string name="help_tradeoff_default_title">SHA-256 and SHA-1 on by default</string>
+    <string name="help_tradeoff_default_body">SHA-256 is the common default; SHA-1 is still used by many older lists, so it is computed alongside. Everything else is opt-in.</string>
+    <string name="help_tradeoff_legacy_title">MD5 / SHA-1 are kept</string>
+    <string name="help_tradeoff_legacy_body">For one reason only: some old sites and documents publish only those values — to compare, you must be able to compute them.</string>
+    <string name="help_tradeoff_case_title">Verification is case-insensitive</string>
+    <string name="help_tradeoff_case_body">Uppercase or lowercase hex is just a writing convention; the two spellings of a byte are treated the same when comparing.</string>
+    <string name="help_tradeoff_parallel_title">Batch parallelism (2 by default)</string>
+    <string name="help_tradeoff_parallel_body">A single file’s hash chain can’t be parallelized; hashing several files at once (1–8) is what lifts total throughput.</string>
+    <string name="help_footer">Speed numbers are measured on this device and vary with model and frequency tier; the conclusion “hardware ≫ software” holds regardless.</string>
+
+    <!-- ============ Notification channels ============ -->
+    <string name="notif_channel_progress_name">Progress</string>
+    <string name="notif_channel_progress_desc">Persistent progress notification while computing (silent, not dismissible)</string>
+    <string name="notif_channel_result_name">Alerts</string>
+    <string name="notif_channel_result_desc">Alerts for completion, mismatch, etc.</string>
+    <string name="notif_cancel_action">Cancel</string>
+    <string name="notif_default_title">Computing hash</string>
+    <string name="notif_preparing">Preparing…</string>
+
+    <!-- ============ Plurals ============ -->
+    <plurals name="file_count">
+        <item quantity="one">%d file</item>
+        <item quantity="other">%d files</item>
+    </plurals>
+    <plurals name="files_more">
+        <item quantity="one">%d more file — tap to show all</item>
+        <item quantity="other">%d more files — tap to show all</item>
+    </plurals>
+    <plurals name="files_unknown_size">
+        <item quantity="one">%d file doesn’t report its size; progress is based on known bytes</item>
+        <item quantity="other">%d files don’t report their size; progress is based on known bytes</item>
+    </plurals>
+    <plurals name="files_failed">
+        <item quantity="one">%d file failed</item>
+        <item quantity="other">%d files failed</item>
+    </plurals>
+    <plurals name="ignored_lines">
+        <item quantity="one">%d line wasn’t recognized and was ignored</item>
+        <item quantity="other">%d lines weren’t recognized and were ignored</item>
+    </plurals>
+    <plurals name="entries_count">
+        <item quantity="one">%d entry</item>
+        <item quantity="other">%d entries</item>
+    </plurals>
+    <plurals name="start_hash_files">
+        <item quantity="one">Hash %d file</item>
+        <item quantity="other">Hash %d files</item>
+    </plurals>
+    <plurals name="start_verify_files">
+        <item quantity="one">Verify %d file</item>
+        <item quantity="other">Verify %d files</item>
+    </plurals>
+    <plurals name="export_default_name">
+        <item quantity="one">Default name %1$s · %2$d entry</item>
+        <item quantity="other">Default name %1$s · %2$d entries</item>
+    </plurals>
+</resources>

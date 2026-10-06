@@ -1,5 +1,6 @@
 package io.github.xiaokun19.hashlite
 
+import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import android.os.Build
@@ -8,7 +9,10 @@ import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.mutableStateOf
+import androidx.core.view.WindowCompat
 import androidx.lifecycle.lifecycleScope
 import io.github.xiaokun19.hashlite.core.HardwareAcceleration
 import io.github.xiaokun19.hashlite.core.Hwcap
@@ -32,6 +36,9 @@ class MainActivity : ComponentActivity() {
      * LaunchedEffect 不会重跑，界面上会残留上一次的计算结果。
      */
     private val incomingNonce = mutableStateOf(0L)
+
+    /** 深浅色模式：默认跟随系统；由设置面板修改（Compose 状态，改一下全树重组）。 */
+    private val themeMode = mutableStateOf(ThemeMode.SYSTEM)
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -59,14 +66,43 @@ class MainActivity : ComponentActivity() {
         }
 
         handleIncoming(intent)
+        themeMode.value = AppSettings.of(this).themeMode
+        // 通知渠道的名称/说明跟随“界面语言”：启动时顺手建一遍（幂等，会更新名称）
+        HashService.ensureChannels(this)
+
         setContent {
-            HashLiteTheme {
+            val mode = themeMode.value
+            val dark = when (mode) {
+                ThemeMode.SYSTEM -> isSystemInDarkTheme()
+                ThemeMode.LIGHT -> false
+                ThemeMode.DARK -> true
+            }
+            // 系统栏图标颜色跟随“实际生效”的主题（手动覆盖时不能再用系统值）
+            LaunchedEffect(dark) { applySystemBarAppearance(dark) }
+            HashLiteTheme(darkTheme = dark) {
                 LiteScreen(
                     incomingUri = incomingUri.value,
                     incomingNonce = incomingNonce.value,
+                    themeMode = mode,
+                    onThemeModeChange = { chosen ->
+                        themeMode.value = chosen
+                        AppSettings.of(this@MainActivity).themeMode = chosen
+                    },
                 )
             }
         }
+    }
+
+    /** 界面语言换成别的语言时，资源要靠 recreate 重载（locale 在 attachBaseContext 里套）。 */
+    override fun attachBaseContext(newBase: Context) {
+        super.attachBaseContext(AppLocale.wrap(newBase))
+    }
+
+    /** 系统栏（状态栏/导航栏）图标亮暗跟随 App 实际主题。 */
+    private fun applySystemBarAppearance(dark: Boolean) {
+        val controller = WindowCompat.getInsetsController(window, window.decorView)
+        controller.isAppearanceLightStatusBars = !dark
+        controller.isAppearanceLightNavigationBars = !dark
     }
 
     override fun onStart() {
@@ -223,14 +259,20 @@ class MainActivity : ComponentActivity() {
         sb.appendLine("已写入缓存（下次启动直接命中，不再探测）")
         sb.appendLine()
         for (algorithm in LiteAlgorithm.entries) {
-            val on = HardwareAcceleration.isAccelerated(algorithm, flags, ratios)
+            // SHA3 走内置汇编时也是“实际在用加速路径”，和 UI 的亮标规则保持一致
+            val on = HardwareAcceleration.isAccelerated(algorithm, flags, ratios) || algorithm.nativeAccelerated
+            val why = if (algorithm.nativeAccelerated) {
+                "内置汇编实现（native 库可用）"
+            } else {
+                HardwareAcceleration.explain(algorithm, flags, ratios)
+            }
             sb.appendLine(
                 String.format(
                     Locale.US,
                     "%-10s 徽标=%-2s  %s",
                     algorithm.label,
                     if (on) "亮" else "灭",
-                    HardwareAcceleration.explain(algorithm, flags, ratios),
+                    why,
                 ),
             )
         }

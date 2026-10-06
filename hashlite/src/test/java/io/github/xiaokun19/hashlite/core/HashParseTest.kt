@@ -87,7 +87,10 @@ class HashParseTest {
         assertTrue(HashParse.formatSpeed(1_500.0 * 1024 * 1024).endsWith("/s"))
         assertTrue(HashParse.formatDuration(500_000).contains("µs"))
         assertTrue(HashParse.formatDuration(2_500_000_000).contains("s"))
-        assertEquals("", HashParse.formatEta(-1.0))
-        assertTrue(HashParse.formatEta(12.0).isNotEmpty())
+        assertNull(HashParse.etaParts(-1.0))
+        assertNull(HashParse.etaParts(Double.NaN))
+        assertEquals(0L to 12L, HashParse.etaParts(12.0))
+        assertEquals(1L to 30L, HashParse.etaParts(90.0))
+        assertEquals(2L to 0L, HashParse.etaParts(119.6))
     }
 }

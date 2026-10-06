@@ -13,6 +13,8 @@ data class HashOutcome(
     val totalBytes: Long,
     val elapsedNanos: Long,
     val error: String? = null,
+    /** 用户主动取消：不算“错误”（error 为空、hex 为空），UI 用中性样式显示。 */
+    val cancelled: Boolean = false,
 ) {
     val success: Boolean get() = error == null && hexByAlgorithm.isNotEmpty()
 
@@ -221,10 +223,11 @@ class LiteHasher(
         } else {
             emptyMap()
         }
+        // 用户取消：不算“错误”——error 留空、cancelled 置位，文案交给 UI 层
+        val wasCancelled = cancelled && error == null
         val message = error
-            ?: if (cancelled) "已取消"
-            else if (consumed != nBlocks) "读取未完成（$done / $total 字节）" else null
-        return HashOutcome(hex, done, elapsed, message)
+            ?: if (!wasCancelled && consumed != nBlocks) "读取未完成（$done / $total 字节）" else null
+        return HashOutcome(hex, done, elapsed, message, cancelled = wasCancelled)
     }
 
     /** 文件大小未知时的退路：单缓冲顺序读到 EOF。 */
@@ -277,7 +280,7 @@ class LiteHasher(
         } else {
             emptyMap()
         }
-        return HashOutcome(hex, done, elapsed, error ?: if (cancelled) "已取消" else null)
+        return HashOutcome(hex, done, elapsed, error, cancelled = cancelled && error == null)
     }
 
     private companion object {

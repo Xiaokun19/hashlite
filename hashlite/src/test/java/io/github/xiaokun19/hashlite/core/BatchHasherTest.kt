@@ -213,7 +213,7 @@ class BatchHasherTest {
 
         assertTrue(report.cancelled)
         assertEquals(files.size, report.results.size)
-        assertTrue(report.results.all { it.verdict == Verdict.ERROR && it.error == "已取消" })
+        assertTrue(report.results.all { it.verdict == Verdict.ERROR && it.cancelled && it.error == null })
         assertEquals(0L, report.totalBytes)
     }
 
