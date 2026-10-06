@@ -72,13 +72,47 @@ object NativeSelfCheck {
         sb.appendLine()
 
         sb.appendLine("--- 速度对比（同一块 ${sizeMiB} MiB 数据，App 口径）---")
-        // 交替测量：否则先测的那个把机器烤热，后测的吃亏（上一轮实测里 BC 掉了一半就是这原因）
+        // 交替测量：否则先测的那个把机器烤热，后测的吃亏
+        // 顺带记录**每轮跑在哪个 CPU**（/proc/self/stat 第 39 字段）与距开跑的时间：
+        // 若速度低的轮次集中在同一个核上，就能坐实"被调度到小核/被降档"，而不是热降频。
         var nativeBest = 0.0
         var bcBest = 0.0
-        repeat(3) {
-            nativeBest = maxOf(nativeBest, mbps(hashOnce(data, native = true), n))
-            bcBest = maxOf(bcBest, mbps(hashOnce(data, native = false), n))
+        val t0 = System.nanoTime()
+        fun since(): String = String.format(Locale.US, "%5.2fs", (System.nanoTime() - t0) / 1e9)
+
+        sb.appendLine("  [bench 阶段结束 @${since()}]")
+        repeat(3) { i ->
+            val nNanos = hashOnce(data, native = true)
+            val nCpu = currentCpu()
+            val nSpeed = mbps(nNanos, n)
+            nativeBest = maxOf(nativeBest, nSpeed)
+
+            val bNanos = hashOnce(data, native = false)
+            val bCpu = currentCpu()
+            val bSpeed = mbps(bNanos, n)
+            bcBest = maxOf(bcBest, bSpeed)
+
+            sb.appendLine(
+                String.format(
+                    Locale.US,
+                    "  轮%d  native %7.1f MB/s (cpu=%d)   BC %7.1f MB/s (cpu=%d)   @%s",
+                    i + 1, nSpeed, nCpu, bSpeed, bCpu, since(),
+                ),
+            )
         }
+
+        // 反向再测一轮：如果"先测的总是更快"，说明是瞬时加速窗口在起作用
+        val bFirst = mbps(hashOnce(data, native = false), n)
+        val bCpu2 = currentCpu()
+        val nSecond = mbps(hashOnce(data, native = true), n)
+        val nCpu2 = currentCpu()
+        sb.appendLine(
+            String.format(
+                Locale.US,
+                "  反序  BC %7.1f MB/s (cpu=%d)   native %7.1f MB/s (cpu=%d)   @%s",
+                bFirst, bCpu2, nSecond, nCpu2, since(),
+            ),
+        )
         sb.appendLine(
             String.format(
                 Locale.US,
@@ -106,4 +140,15 @@ object NativeSelfCheck {
 
     private fun mbps(nanos: Long, bytes: Int): Double =
         if (nanos <= 0L) 0.0 else bytes.toDouble() / (nanos / 1_000_000_000.0) / (1024.0 * 1024.0)
+
+    /**
+     * 当前线程最近一次跑在哪个 CPU 上：`/proc/self/stat` 的第 39 字段（processor）。
+     * 第 2 字段 comm 可能含空格/括号，所以先从最后一个 ") " 之后开始数（那之后就是第 3 字段起）。
+     */
+    private fun currentCpu(): Int = try {
+        val stat = java.io.File("/proc/self/stat").readText()
+        stat.substringAfterLast(") ").split(' ').getOrNull(36)?.toIntOrNull() ?: -1
+    } catch (t: Throwable) {
+        -1
+    }
 }
