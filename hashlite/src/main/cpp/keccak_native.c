@@ -187,6 +187,13 @@ static double bench_one(const unsigned char *buf, size_t len, size_t rate,
                         int cext, int iters) {
     unsigned char out[32];
     double best = 0;
+    /* 先预热一轮：第一遍要付页错误/指令缓存的钱，不能算进结果 */
+    {
+        kc_ctx warm;
+        kc_init_variant(&warm, rate, cext);
+        kc_update(&warm, buf, len);
+        kc_final(&warm, out, 32, KC_DOMAIN_SHA3);
+    }
     for (int r = 0; r < 3; r++) {
         kc_ctx ctx;
         double t0 = now_sec();
@@ -225,6 +232,7 @@ void kc_choose_variant_by_bench(size_t bytes) {
         g_variant = 0;
         return;
     }
+    if (bytes < 16u * 1024 * 1024) bytes = 16u * 1024 * 1024; /* 小样本噪声大，下限 16 MiB */
     double plain = 0, cext = 0;
     kc_bench(&plain, &cext, bytes);
     /* 只有实测更快（>3%）才切 cext —— 作者注释里 X2 类核会显著更慢 */

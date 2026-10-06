@@ -19,7 +19,21 @@ android {
         }
     }
 
+    // 仓库自带的调试签名（口令是 Android 惯例的 "android"，只是 debug key）。
+    // 目的：**CI 出的 APK 能直接覆盖本机编译的 APK**，省掉"签名不匹配 → 先卸载"的来回。
+    signingConfigs {
+        create("sharedDebug") {
+            storeFile = file("debug.keystore")
+            storePassword = "android"
+            keyAlias = "hashdebug"
+            keyPassword = "android"
+        }
+    }
+
     buildTypes {
+        getByName("debug") {
+            signingConfig = signingConfigs.getByName("sharedDebug")
+        }
         release {
             isMinifyEnabled = false
             proguardFiles(

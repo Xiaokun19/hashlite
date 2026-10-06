@@ -72,8 +72,13 @@ object NativeSelfCheck {
         sb.appendLine()
 
         sb.appendLine("--- 速度对比（同一块 ${sizeMiB} MiB 数据，App 口径）---")
-        val nativeBest = bestOf(n, 3) { hashOnce(data, native = true) }
-        val bcBest = bestOf(n, 3) { hashOnce(data, native = false) }
+        // 交替测量：否则先测的那个把机器烤热，后测的吃亏（上一轮实测里 BC 掉了一半就是这原因）
+        var nativeBest = 0.0
+        var bcBest = 0.0
+        repeat(3) {
+            nativeBest = maxOf(nativeBest, mbps(hashOnce(data, native = true), n))
+            bcBest = maxOf(bcBest, mbps(hashOnce(data, native = false), n))
+        }
         sb.appendLine(
             String.format(
                 Locale.US,
@@ -98,15 +103,6 @@ object NativeSelfCheck {
         return System.nanoTime() - t0
     }
 
-    private fun bestOf(bytes: Int, rounds: Int, block: () -> Long): Double {
-        var best = 0.0
-        repeat(rounds) {
-            val nanos = block()
-            if (nanos > 0L) {
-                val mbps = bytes.toDouble() / (nanos / 1_000_000_000.0) / (1024.0 * 1024.0)
-                if (mbps > best) best = mbps
-            }
-        }
-        return best
-    }
+    private fun mbps(nanos: Long, bytes: Int): Double =
+        if (nanos <= 0L) 0.0 else bytes.toDouble() / (nanos / 1_000_000_000.0) / (1024.0 * 1024.0)
 }
