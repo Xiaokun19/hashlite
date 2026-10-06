@@ -51,6 +51,13 @@ class MainActivity : ComponentActivity() {
             return
         }
 
+        // native Keccak 自检（能不能用 / 快多少 / 算得对不对）：
+        //   am start -n io.github.xiaokun19.hashlite/.MainActivity -e nativecheck 1
+        if (intent?.getStringExtra(EXTRA_NATIVECHECK) != null) {
+            runNativeCheckAndExit()
+            return
+        }
+
         handleIncoming(intent)
         setContent {
             HashLiteTheme {
@@ -124,6 +131,19 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    /** native Keccak 自检：报告写到 `getExternalFilesDir()/nativecheck.txt`。 */
+    private fun runNativeCheckAndExit() {
+        val sizeMiB = intent?.getStringExtra(EXTRA_SIZE_MIB)?.toIntOrNull() ?: 64
+        lifecycleScope.launch {
+            val base = getExternalFilesDir(null) ?: filesDir
+            val report = withContext(Dispatchers.Default) { NativeSelfCheck.run(sizeMiB) }
+            val target = File(base, "nativecheck.txt")
+            runCatching { target.writeText(report) }
+            Log.i(TAG, report)
+            finish()
+        }
+    }
+
     private fun buildHardwareReport(): String {
         val sb = StringBuilder()
         val flags = HardwareAcceleration.readCpuFlags()
@@ -186,6 +206,7 @@ class MainActivity : ComponentActivity() {
         const val TAG = "HashLite"
         const val EXTRA_HWCHECK = "hwcheck"
         const val EXTRA_BATCHCHECK = "batchcheck"
+        const val EXTRA_NATIVECHECK = "nativecheck"
         const val EXTRA_FILES = "files"
         const val EXTRA_SIZE_MIB = "sizeMiB"
         const val EXTRA_WORKERS = "workers"

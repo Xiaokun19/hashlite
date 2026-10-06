@@ -55,17 +55,42 @@ enum class LiteAlgorithm(
             else -> null
         }
 
+    /**
+     * 构造摘要实现。
+     *
+     * SHA3-256/512 优先走 **native**（vendored OpenSSL 汇编，实测 2.4–2.8×），
+     * 但只在 [NativeKeccak.usable]（库加载成功 **且** 向量自检通过）时启用；
+     * 否则回退 BouncyCastle——宁可慢，也绝不产出错哈希。
+     */
     fun newDigest(): BlockDigest = when (kind) {
         Kind.JCA -> JcaDigest(MessageDigest.getInstance(label))
         Kind.BC -> when (this) {
-            SHA3_256 -> BcBlockDigest(SHA3Digest(256), 32)
-            SHA3_512 -> BcBlockDigest(SHA3Digest(512), 64)
+            SHA3_256 -> if (NativeKeccak.usable) {
+                NativeBlockDigest(NativeKeccak.RATE_SHA3_256, 32)
+            } else {
+                BcBlockDigest(SHA3Digest(256), 32)
+            }
+
+            SHA3_512 -> if (NativeKeccak.usable) {
+                NativeBlockDigest(NativeKeccak.RATE_SHA3_512, 64)
+            } else {
+                BcBlockDigest(SHA3Digest(512), 64)
+            }
+
             SM3 -> BcBlockDigest(SM3Digest(), 32)
             else -> error("$label 缺少 BC 实现")
         }
 
         Kind.CRC32 -> Crc32Digest()
     }
+
+    /** 当前实际会用的实现来源（诊断/展示用）。 */
+    val implementation: String
+        get() = when (kind) {
+            Kind.JCA -> "平台"
+            Kind.CRC32 -> "zlib"
+            Kind.BC -> if ((this == SHA3_256 || this == SHA3_512) && NativeKeccak.usable) "native" else "BC"
+        }
 
     companion object {
         val DEFAULT_SELECTION = listOf(SHA256, SHA1)

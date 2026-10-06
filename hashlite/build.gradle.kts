@@ -40,6 +40,33 @@ android {
             excludes += "/META-INF/{AL2.0,LGPL2.1}"
         }
     }
+
+    // ---------------------------------------------------------------- native（可选件）
+    // libkeccak.so 的汇编是 aarch64 专属，而 NDK 的**宿主工具链只有 x86_64**——
+    // 本机（ARM64 proot）根本执行不了 NDK 编译器，所以本地默认不编 native
+    // （App 会自动回退 BouncyCastle，功能不受影响），由 CI（x86_64 runner）加
+    val nativeEnabled = (project.findProperty("hashlite.native") as String?)?.toBoolean() == true
+    if (nativeEnabled) {
+        ndkVersion = "28.2.13676358"
+
+        defaultConfig {
+            ndk {
+                // 只打 arm64-v8a：汇编只在 aarch64 上有意义
+                abiFilters += "arm64-v8a"
+            }
+            externalNativeBuild {
+                cmake {
+                    arguments += listOf("-DANDROID_STL=none")
+                }
+            }
+        }
+
+        externalNativeBuild {
+            cmake {
+                path = file("src/main/cpp/CMakeLists.txt")
+            }
+        }
+    }
 }
 
 // 纯净版原本刻意不引 BouncyCastle；现在要支持 SHA-3 与国密 SM3，而 Android 平台

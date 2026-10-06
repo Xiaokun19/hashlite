@@ -38,17 +38,29 @@ jobs:
       # （proot/Ubuntu aarch64）用的：它会把 SDK 里的 aapt2 换成随仓库携带的 ARM64 版本，
       # 在 x86_64 runner 上必然对不上。runner 自带 SDK 与已接受的许可，AGP 会自己按需补组件。
 
+      - name: Install NDK (native 构建用，版本与本地约定一致)
+        run: yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --install "ndk;28.2.13676358" > /dev/null
+
       - name: Unit tests
         run: ./gradlew :hashlite:test --console=plain
 
-      - name: Assemble debug APK
-        run: ./gradlew :hashlite:assembleDebug --console=plain
+      # native 在本地（ARM64）编不了（NDK 宿主工具链只有 x86_64），所以这里显式开启：
+      # -Phashlite.native=true 会启用 externalNativeBuild + abiFilters arm64-v8a
+      - name: Assemble debug APK (with native keccak)
+        run: ./gradlew :hashlite:assembleDebug -Phashlite.native=true --console=plain
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
           name: hashlite-debug-apk
           path: hashlite/build/outputs/apk/debug/*.apk
+          if-no-files-found: error
+
+      - name: Upload libkeccak.so (arm64-v8a)
+        uses: actions/upload-artifact@v4
+        with:
+          name: libkeccak-arm64-v8a
+          path: hashlite/build/intermediates/cxx/**/obj/arm64-v8a/libkeccak.so
           if-no-files-found: error
 
       - name: Upload test reports
