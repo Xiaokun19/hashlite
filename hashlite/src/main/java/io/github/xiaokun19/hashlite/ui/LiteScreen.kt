@@ -3,6 +3,7 @@ package io.github.xiaokun19.hashlite.ui
 import android.app.Activity
 import android.content.Context
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Build
 import android.provider.OpenableColumns
@@ -67,6 +68,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.text.TextStyle
 import io.github.xiaokun19.hashlite.AppSettings
+import io.github.xiaokun19.hashlite.Diagnostics
 import io.github.xiaokun19.hashlite.R
 import io.github.xiaokun19.hashlite.RunKeeper
 import io.github.xiaokun19.hashlite.ThemeMode
@@ -76,6 +78,8 @@ import io.github.xiaokun19.hashlite.core.HashProgress
 import io.github.xiaokun19.hashlite.core.HardwareAcceleration
 import io.github.xiaokun19.hashlite.core.LiteAlgorithm
 import io.github.xiaokun19.hashlite.core.LiteHasher
+import io.github.xiaokun19.hashlite.core.NativeKeccak
+import io.github.xiaokun19.hashlite.core.SafTree
 import io.github.xiaokun19.hashlite.ui.theme.verdictColors
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -177,6 +181,15 @@ fun LiteScreen(
     var notifyResult by remember { mutableStateOf(appSettings.notifyResult) }
     var keepAwake by remember { mutableStateOf(appSettings.keepAwake) }
     var language by remember { mutableStateOf(appSettings.language) }
+
+    // 诊断日志（崩溃 + 非致命错误）：列表 / 未读提示 / 查看与导出
+    var diagFiles by remember { mutableStateOf<List<Diagnostics.Entry>>(emptyList()) }
+    var diagUnseen by remember { mutableStateOf<Diagnostics.Entry?>(null) }
+    var showDiagSheet by remember { mutableStateOf(false) }
+    var diagSelected by remember { mutableStateOf<Diagnostics.Entry?>(null) }
+    var diagText by remember { mutableStateOf("") }
+    var diagCopied by remember { mutableStateOf(false) }
+    var diagSaved by remember { mutableStateOf(false) }
     var notifyGranted by remember { mutableStateOf(notificationPermissionGranted(context)) }
     var batteryOk by remember { mutableStateOf(batteryUnrestricted(context)) }
     val permissionLauncher =
@@ -211,12 +224,57 @@ fun LiteScreen(
         }
     }
 
+    // 诊断日志：SAF 保存（与批量导出同一套写法）
+    val diagSaver = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("text/plain")) { uri ->
+        if (uri != null && diagSelected != null) {
+            val text = diagText
+            scope.launch {
+                val ok = withContext(Dispatchers.IO) { SafTree.writeText(context.contentResolver, uri, text) }
+                if (ok) {
+                    diagSaved = true
+                    delay(1500)
+                    if (diagSaved) diagSaved = false
+                }
+            }
+        }
+    }
+
     fun copyToClipboard(label: String, text: String) {
         clipboard.setText(AnnotatedString(text))
         state.copied = label
         scope.launch {
             delay(1400)
             if (state.copied == label) state.copied = null
+        }
+    }
+
+    fun refreshDiag() {
+        diagFiles = Diagnostics.list(context)
+        diagUnseen = Diagnostics.latestUnseen(context)
+    }
+
+    fun openDiagSheet(entry: Diagnostics.Entry?) {
+        val list = Diagnostics.list(context)
+        val target = entry ?: list.firstOrNull() ?: return
+        diagFiles = list
+        diagSelected = target
+        diagText = Diagnostics.read(context, target)
+        Diagnostics.markSeen(context, target) // 看过即不再提示（卡片随之消失）
+        diagUnseen = Diagnostics.latestUnseen(context)
+        showDiagSheet = true
+    }
+
+    fun shareDiag(entry: Diagnostics.Entry) {
+        val intent = Intent(Intent.ACTION_SEND).apply {
+            type = "text/plain"
+            putExtra(
+                Intent.EXTRA_SUBJECT,
+                context.getString(R.string.diag_share_subject, Diagnostics.displayTime(entry.timeMillis)),
+            )
+            putExtra(Intent.EXTRA_TEXT, Diagnostics.read(context, entry))
+        }
+        runCatching {
+            context.startActivity(Intent.createChooser(intent, context.getString(R.string.diag_share_chooser)))
         }
     }
 
@@ -236,6 +294,10 @@ fun LiteScreen(
             longTask = state.fileSize <= 0L || state.fileSize >= RunKeeper.LONG_TASK_BYTES,
         )
         RunKeeper.setCancelHook { hasher.cancel() } // 通知栏上的"取消"
+        Diagnostics.breadcrumb(
+            "hash.start name=${state.fileName.take(120)} size=${state.fileSize} " +
+                "algos=${state.selected.joinToString("/") { it.label }}",
+        )
         scope.launch {
             val result = withContext(Dispatchers.Default) {
                 runCatching {
@@ -271,7 +333,11 @@ fun LiteScreen(
             result.onSuccess { outcome ->
                 state.outcome = outcome
                 val cancelled = outcome.cancelled
-                if (outcome.error != null) state.error = outcome.error
+                if (outcome.error != null) {
+                    state.error = outcome.error
+                    Diagnostics.recordError(context, "哈希读取失败", "${state.fileName}: ${outcome.error}")
+                }
+                Diagnostics.breadcrumb("hash.end ok=${outcome.success} cancelled=$cancelled err=${outcome.error ?: "-"}")
                 RunKeeper.end(
                     context,
                     when {
@@ -285,6 +351,7 @@ fun LiteScreen(
                 )
             }.onFailure {
                 state.error = it.message ?: it.toString()
+                Diagnostics.recordError(context, "哈希计算异常", "${state.fileName}: ${it.message ?: it}", it)
                 RunKeeper.end(
                     context,
                     context.getString(R.string.notif_title_failed, state.fileName),
@@ -316,6 +383,25 @@ fun LiteScreen(
         } else {
             android.util.Log.i("HashLite", "accel: 命中缓存，跳过探测")
         }
+
+        // 诊断日志：刷新未读提示 + 启动检查（"本应带 native 的构建"却不可用 → 记一条错误，进程内一次）
+        refreshDiag()
+        if (Diagnostics.once("native-check")) {
+            val expected = nativeExpected(context)
+            val loaded = NativeKeccak.loaded
+            Diagnostics.breadcrumb("native: expected=$expected loaded=$loaded usable=${NativeKeccak.usable}")
+            if (expected && !NativeKeccak.usable) {
+                val detail = if (loaded) {
+                    "库已加载但向量自检未通过：selfTestFails=${runCatching { NativeKeccak.selfTest() }.getOrDefault(-1)}" +
+                        " · hwcapSha3=${runCatching { NativeKeccak.haveSha3Ext() }.getOrDefault(false)}" +
+                        " · variant=${runCatching { NativeKeccak.variantName() }.getOrDefault("?")}"
+                } else {
+                    "libkeccak.so 加载失败（该构建本应携带它；可能是设备/ROM 兼容问题）"
+                }
+                Diagnostics.recordError(context, "SHA-3 加速库不可用，已回退纯软件实现", detail)
+                refreshDiag()
+            }
+        }
     }
 
     val colors = MaterialTheme.colorScheme
@@ -344,6 +430,19 @@ fun LiteScreen(
                 onHelp = { state.showHelp = true },
                 onSettings = { state.showSettings = true },
             )
+
+            // 有未查看的诊断日志（崩溃 / 错误报告）时提示一次；查看或忽略后消失
+            diagUnseen?.let { entry ->
+                DiagnosticsCard(
+                    entry = entry,
+                    onView = { openDiagSheet(entry) },
+                    onShare = { shareDiag(entry) },
+                    onIgnore = {
+                        Diagnostics.markSeen(context, entry)
+                        refreshDiag()
+                    },
+                )
+            }
 
             ModeSwitcher(mode = mode, onSelect = { mode = it })
 
@@ -438,6 +537,9 @@ fun LiteScreen(
                     themeMode = themeMode,
                     language = language,
                     languageEnabled = !state.running,
+                    diagCrashCount = diagFiles.count { it.kind == Diagnostics.Kind.CRASH },
+                    diagErrorCount = diagFiles.count { it.kind == Diagnostics.Kind.ERROR },
+                    diagLatestLabel = diagFiles.firstOrNull()?.let { Diagnostics.displayTime(it.timeMillis) },
                     onKeepScreenOn = {
                         keepScreenOn = it
                         appSettings.keepScreenOn = it
@@ -465,8 +567,59 @@ fun LiteScreen(
                         // 语言资源要靠 recreate 重载（locale 在 attachBaseContext 里套）
                         (context as? Activity)?.recreate()
                     },
+                    onOpenDiag = { openDiagSheet(null) },
                     onRequestUnrestricted = { requestBatteryUnrestricted(context) },
                     onClose = { state.showSettings = false },
+                    modifier = Modifier.align(Alignment.BottomCenter),
+                )
+            }
+
+            // 诊断日志面板：同一套浮层语言（遮罩点击关闭）
+            if (showDiagSheet && diagSelected != null) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(Color.Black.copy(alpha = 0.42f))
+                        .clickable(
+                            interactionSource = remember { MutableInteractionSource() },
+                            indication = null,
+                        ) { showDiagSheet = false },
+                )
+                DiagnosticsSheet(
+                    entries = diagFiles,
+                    selected = diagSelected,
+                    text = diagText,
+                    copied = diagCopied,
+                    saved = diagSaved,
+                    onSelect = { entry ->
+                        diagSelected = entry
+                        diagText = Diagnostics.read(context, entry)
+                    },
+                    onShare = { diagSelected?.let { shareDiag(it) } },
+                    onSave = { diagSelected?.let { diagSaver.launch(Diagnostics.exportName(it)) } },
+                    onCopy = {
+                        clipboard.setText(AnnotatedString(diagText))
+                        diagCopied = true
+                        scope.launch {
+                            delay(1400)
+                            diagCopied = false
+                        }
+                    },
+                    onDelete = {
+                        diagSelected?.let { Diagnostics.delete(context, it) }
+                        val list = Diagnostics.list(context)
+                        diagFiles = list
+                        diagUnseen = Diagnostics.latestUnseen(context)
+                        val next = list.firstOrNull()
+                        if (next == null) {
+                            showDiagSheet = false
+                            diagSelected = null
+                        } else {
+                            diagSelected = next
+                            diagText = Diagnostics.read(context, next)
+                        }
+                    },
+                    onClose = { showDiagSheet = false },
                     modifier = Modifier.align(Alignment.BottomCenter),
                 )
             }
@@ -1023,6 +1176,13 @@ private fun querySize(context: Context, uri: Uri): Long {
     }
     return 0L
 }
+
+/** 该构建是否"本应携带 native 库"（由构建时注入的 meta-data 标记）。 */
+private fun nativeExpected(context: Context): Boolean = runCatching {
+    val info = context.packageManager.getApplicationInfo(context.packageName, PackageManager.GET_META_DATA)
+    // 兼容两种存法：字符串 "true" 或布尔 true
+    info.metaData?.get("hashlite.nativeExpected")?.toString() == "true"
+}.getOrDefault(false)
 
 @Suppress("unused")
 private val unusedColorGuard: Color = Color.Transparent

@@ -65,6 +65,23 @@ class MainActivity : ComponentActivity() {
             return
         }
 
+        // 错误报告自检（写一条非致命错误再退出；报告进 reports/error-*.txt）：
+        //   am start -n io.github.xiaokun19.hashlite/.MainActivity -e errorcheck 1
+        if (intent?.getStringExtra(EXTRA_ERRORCHECK) != null) {
+            Diagnostics.recordError(this, "测试错误报告（-e errorcheck 1）", "无头自检写入的错误样例；App 不会崩溃。")
+            finish()
+            return
+        }
+
+        // 崩溃日志自检（延迟 1.5s 抛异常 → 全局捕获 → 写报告 → 系统杀进程）：
+        //   am start -n io.github.xiaokun19.hashlite/.MainActivity -e crashcheck 1
+        if (intent?.getStringExtra(EXTRA_CRASHCHECK) != null) {
+            window.decorView.postDelayed(
+                { throw RuntimeException("测试崩溃（-e crashcheck 1）：诊断日志自检") },
+                1_500,
+            )
+        }
+
         handleIncoming(intent)
         themeMode.value = AppSettings.of(this).themeMode
         // 通知渠道的名称/说明跟随“界面语言”：启动时顺手建一遍（幂等，会更新名称）
@@ -119,11 +136,24 @@ class MainActivity : ComponentActivity() {
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         setIntent(intent)
+        // 诊断自检入口：支持 App 已经在前台运行时再触发
+        if (intent.getStringExtra(EXTRA_ERRORCHECK) != null) {
+            Diagnostics.recordError(this, "测试错误报告（-e errorcheck 1）", "无头自检写入的错误样例；App 不会崩溃。")
+            finish()
+            return
+        }
+        if (intent.getStringExtra(EXTRA_CRASHCHECK) != null) {
+            window.decorView.postDelayed(
+                { throw RuntimeException("测试崩溃（-e crashcheck 1）：诊断日志自检") },
+                1_500,
+            )
+        }
         handleIncoming(intent)
     }
 
     private fun handleIncoming(intent: Intent?) {
         val uri = extractUri(intent) ?: return
+        Diagnostics.breadcrumb("intent.file $uri")
         incomingUri.value = uri
         incomingNonce.value += 1
     }
@@ -284,6 +314,8 @@ class MainActivity : ComponentActivity() {
         const val EXTRA_HWCHECK = "hwcheck"
         const val EXTRA_BATCHCHECK = "batchcheck"
         const val EXTRA_NATIVECHECK = "nativecheck"
+        const val EXTRA_CRASHCHECK = "crashcheck"
+        const val EXTRA_ERRORCHECK = "errorcheck"
         const val EXTRA_SUSTAIN = "sustain"
         const val EXTRA_FGS = "fgs"
         const val EXTRA_FILES = "files"

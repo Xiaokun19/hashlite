@@ -47,6 +47,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import io.github.xiaokun19.hashlite.Diagnostics
 import io.github.xiaokun19.hashlite.R
 import io.github.xiaokun19.hashlite.RunKeeper
 import io.github.xiaokun19.hashlite.core.AndroidBatchFile
@@ -207,7 +208,10 @@ fun BatchSection(state: BatchUiState) {
             scope.launch {
                 val message = withContext(Dispatchers.IO) {
                     runCatching { state.loadChecksum(context, uri) }
-                        .getOrElse { it.message ?: it.toString() }
+                        .getOrElse {
+                            Diagnostics.recordError(context, "校验文件读取失败", it.message ?: it.toString())
+                            it.message ?: it.toString()
+                        }
                 }
                 if (message != null) state.error = message
             }
@@ -229,6 +233,7 @@ fun BatchSection(state: BatchUiState) {
                     if (state.copied == "SAVED") state.copied = null
                 } else {
                     state.error = context.getString(R.string.batch_write_failed)
+                    Diagnostics.recordError(context, "清单导出写入失败", null)
                 }
             }
         }
@@ -259,6 +264,9 @@ fun BatchSection(state: BatchUiState) {
             longTask = state.totalBytes >= RunKeeper.LONG_TASK_BYTES,
         )
         RunKeeper.setCancelHook { hasher.cancel() } // 通知栏上的"取消"
+        Diagnostics.breadcrumb(
+            "batch.start files=${tasks.size} workers=${state.workers} withList=${state.checksumList != null}",
+        )
         scope.launch {
             val result = withContext(Dispatchers.Default) {
                 runCatching {
@@ -285,6 +293,16 @@ fun BatchSection(state: BatchUiState) {
                 state.exportAlgorithm = report.results.firstOrNull()?.primaryAlgorithm
                 val cancelled = report.cancelled
                 val hasProblem = report.mismatchedCount > 0 || report.errorCount > 0 || report.missing.isNotEmpty()
+                if (report.errorCount > 0 && !cancelled) {
+                    val samples = report.results.filter { it.verdict == Verdict.ERROR && !it.cancelled }
+                        .take(3)
+                        .joinToString("；") { "${it.name}: ${it.error ?: "未完成"}" }
+                    Diagnostics.recordError(context, "批量中有文件读取失败", "共 ${report.errorCount} 个；样例：$samples")
+                }
+                Diagnostics.breadcrumb(
+                    "batch.end matched=${report.matchedCount} mismatch=${report.mismatchedCount} " +
+                        "missing=${report.missing.size} errors=${report.errorCount} cancelled=$cancelled",
+                )
                 RunKeeper.end(
                     context,
                     when {
@@ -304,6 +322,7 @@ fun BatchSection(state: BatchUiState) {
                 )
             }.onFailure {
                 state.error = it.message ?: it.toString()
+                Diagnostics.recordError(context, "批量计算异常", it.message ?: it.toString(), it)
                 RunKeeper.end(
                     context,
                     context.getString(R.string.notif_title_batch_failed, state.folderName),

@@ -37,6 +37,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import io.github.xiaokun19.hashlite.AppSettings
+import io.github.xiaokun19.hashlite.Diagnostics
 import io.github.xiaokun19.hashlite.HashService
 import io.github.xiaokun19.hashlite.R
 import io.github.xiaokun19.hashlite.ThemeMode
@@ -61,12 +62,16 @@ fun SettingsSheet(
     themeMode: ThemeMode,
     language: String,
     languageEnabled: Boolean,
+    diagCrashCount: Int,
+    diagErrorCount: Int,
+    diagLatestLabel: String?,
     onKeepScreenOn: (Boolean) -> Unit,
     onNotifyProgress: (Boolean) -> Unit,
     onNotifyResult: (Boolean) -> Unit,
     onKeepAwake: (Boolean) -> Unit,
     onThemeMode: (ThemeMode) -> Unit,
     onLanguage: (String) -> Unit,
+    onOpenDiag: () -> Unit,
     onRequestUnrestricted: () -> Unit,
     onClose: () -> Unit,
     modifier: Modifier = Modifier,
@@ -214,6 +219,41 @@ fun SettingsSheet(
                 Spacer(Modifier.height(14.dp))
                 SectionTitle(stringResource(R.string.settings_section_about))
 
+                // 诊断日志（崩溃 / 错误报告）：记录、查看、导出
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 6.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            stringResource(R.string.diag_sheet_title),
+                            fontSize = 14.sp,
+                            fontWeight = FontWeight.Medium,
+                        )
+                        Text(
+                            if (diagCrashCount + diagErrorCount == 0) {
+                                stringResource(R.string.settings_diag_sub_empty)
+                            } else {
+                                stringResource(
+                                    R.string.settings_diag_sub,
+                                    diagCrashCount,
+                                    diagErrorCount,
+                                    diagLatestLabel ?: "—",
+                                )
+                            },
+                            fontSize = 11.sp,
+                            lineHeight = 15.sp,
+                            color = colors.onSurfaceVariant,
+                        )
+                    }
+                    Spacer(Modifier.width(10.dp))
+                    TextButton(onClick = onOpenDiag, enabled = diagCrashCount + diagErrorCount > 0) {
+                        Text(stringResource(R.string.diag_view), fontSize = 13.sp)
+                    }
+                }
+
                 InfoRow(stringResource(R.string.about_version), versionName(context))
                 InfoRow(stringResource(R.string.about_package), context.packageName)
                 InfoRow(
@@ -356,5 +396,7 @@ fun requestBatteryUnrestricted(context: Context) {
                 .setData(android.net.Uri.parse("package:" + context.packageName))
                 .addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK),
         )
+    }.onFailure {
+        Diagnostics.recordError(context, "打开电池优化设置页失败", it.message ?: it.toString())
     }
 }

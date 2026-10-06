@@ -231,6 +231,25 @@
     <string name="notif_default_title">Computing hash</string>
     <string name="notif_preparing">Preparing…</string>
 
+    <!-- ============ Diagnostics (crash / error reports) ============ -->
+    <string name="diag_card_crash_title">The app crashed last time</string>
+    <string name="diag_card_error_title">An error report is waiting</string>
+    <string name="diag_card_sub">Recorded %1$s — export it to send to the developer or an AI for analysis</string>
+    <string name="diag_view">View</string>
+    <string name="diag_share">Share</string>
+    <string name="diag_ignore">Dismiss</string>
+    <string name="diag_sheet_title">Diagnostics</string>
+    <string name="diag_save">Save</string>
+    <string name="diag_copy">Copy</string>
+    <string name="diag_delete">Delete</string>
+    <string name="diag_delete_confirm">Delete this report? This cannot be undone.</string>
+    <string name="diag_share_subject">HashLite diagnostics %1$s</string>
+    <string name="diag_share_chooser">Share diagnostics</string>
+    <string name="diag_kind_crash">Crash</string>
+    <string name="diag_kind_error">Error</string>
+    <string name="settings_diag_sub">Crashes %1$d · Errors %2$d · latest %3$s</string>
+    <string name="settings_diag_sub_empty">Crashes and error reports are kept here for export</string>
+
     <!-- ============ Plurals ============ -->
     <plurals name="file_count">
         <item quantity="one">%d file</item>

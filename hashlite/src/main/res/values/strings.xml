@@ -231,6 +231,25 @@
     <string name="notif_default_title">正在计算哈希</string>
     <string name="notif_preparing">准备中…</string>
 
+    <!-- ============ 诊断日志（崩溃 / 错误报告） ============ -->
+    <string name="diag_card_crash_title">上次运行发生了崩溃</string>
+    <string name="diag_card_error_title">有一条错误报告</string>
+    <string name="diag_card_sub">记录于 %1$s · 可导出给开发者或 AI 分析</string>
+    <string name="diag_view">查看</string>
+    <string name="diag_share">分享</string>
+    <string name="diag_ignore">忽略</string>
+    <string name="diag_sheet_title">诊断日志</string>
+    <string name="diag_save">保存</string>
+    <string name="diag_copy">复制</string>
+    <string name="diag_delete">删除</string>
+    <string name="diag_delete_confirm">删除这份日志？删除后无法恢复。</string>
+    <string name="diag_share_subject">HashLite 诊断日志 %1$s</string>
+    <string name="diag_share_chooser">分享诊断日志</string>
+    <string name="diag_kind_crash">崩溃</string>
+    <string name="diag_kind_error">错误</string>
+    <string name="settings_diag_sub">崩溃 %1$d · 错误 %2$d · 最近 %3$s</string>
+    <string name="settings_diag_sub_empty">崩溃与错误都会记录在这里，可导出分析</string>
+
     <!-- ============ 复数 ============ -->
     <plurals name="file_count">
         <item quantity="other">%d 个文件</item>

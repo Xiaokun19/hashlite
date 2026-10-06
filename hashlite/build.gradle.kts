@@ -17,6 +17,9 @@ android {
         vectorDrawables {
             useSupportLibrary = true
         }
+
+        // 诊断日志用：标记"这个构建是否本应携带 native 库"（见 AndroidManifest 的 meta-data）
+        manifestPlaceholders["hashliteNative"] = "false"
     }
 
     // 仓库自带的调试签名（口令是 Android 惯例的 "android"，只是 debug key）。
@@ -73,6 +76,8 @@ android {
                     arguments += listOf("-DANDROID_STL=none")
                 }
             }
+            // 带 native 的构建：诊断日志据此判断"库加载失败"是否异常
+            manifestPlaceholders["hashliteNative"] = "true"
         }
 
         externalNativeBuild {

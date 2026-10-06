@@ -16,6 +16,7 @@
     <uses-permission android:name="android.permission.WAKE_LOCK" />
 
     <application
+        android:name=".HashLiteApp"
         android:allowBackup="true"
         android:dataExtractionRules="@xml/data_extraction_rules"
         android:fullBackupContent="@xml/backup_rules"
@@ -25,6 +26,11 @@
         android:supportsRtl="true"
         android:theme="@style/Theme.HashLite"
         tools:targetApi="31">
+        <!-- native 构建标记：给诊断日志用（"该构建本应带 libkeccak.so" → 加载失败才值得记录）。
+             由 build.gradle.kts 的 manifestPlaceholders 注入：本地 false / CI(-Phashlite.native=true) true。 -->
+        <meta-data
+            android:name="hashlite.nativeExpected"
+            android:value="${hashliteNative}" />
         <activity
             android:name=".MainActivity"
             android:configChanges="orientation|screenSize|screenLayout|keyboardHidden|uiMode"
