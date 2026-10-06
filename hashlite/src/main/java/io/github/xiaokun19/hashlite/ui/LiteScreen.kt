@@ -265,11 +265,22 @@ fun LiteScreen(
             state.progress = null
             result.onSuccess { outcome ->
                 state.outcome = outcome
+                val cancelled = outcome.error == "已取消"
                 if (outcome.error != null) state.error = outcome.error
-                RunKeeper.end(context, state.fileName, hashSummary(outcome), error = !outcome.success)
+                RunKeeper.end(
+                    context,
+                    when {
+                        cancelled -> "已取消 · ${state.fileName}"
+                        outcome.success -> "✓ 哈希完成 · ${state.fileName}"
+                        else -> "✗ 哈希失败 · ${state.fileName}"
+                    },
+                    if (cancelled) "计算已取消" else hashSummary(outcome),
+                    error = !outcome.success && !cancelled,
+                    cancelled = cancelled,
+                )
             }.onFailure {
                 state.error = it.message ?: it.toString()
-                RunKeeper.end(context, state.fileName, "失败：${it.message ?: it}", error = true)
+                RunKeeper.end(context, "✗ 哈希失败 · ${state.fileName}", it.message ?: "未知错误", error = true)
             }
         }
     }
@@ -302,7 +313,9 @@ fun LiteScreen(
     // CPU 能力只读一次（读 /proc/self/auxv，几 KB 文件，很快）
     val cpuFlags = remember { HardwareAcceleration.readCpuFlags() }
     val accelerated: (LiteAlgorithm) -> Boolean = { algorithm ->
-        HardwareAcceleration.isAccelerated(algorithm, cpuFlags, state.accelRatios)
+        HardwareAcceleration.isAccelerated(algorithm, cpuFlags, state.accelRatios) ||
+            // SHA3 走内置 native 库时也是真·硬件指令（ARMv8.2-SHA3 的 EOR3 等），一并亮徽标
+            algorithm.implementation == "native"
     }
 
     Surface(modifier = Modifier.fillMaxSize(), color = colors.background) {
@@ -353,7 +366,13 @@ fun LiteScreen(
                 CompareCard(state = state)
 
                 state.error?.let { message ->
-                    Text("出错：$message", fontSize = 12.sp, color = colors.error)
+                    // 用户自己取消的不算"错误"：中性色、不带"出错："前缀
+                    val cancelled = message.startsWith("已取消")
+                    Text(
+                        if (cancelled) message else "出错：$message",
+                        fontSize = 12.sp,
+                        color = if (cancelled) colors.onSurfaceVariant else colors.error,
+                    )
                 }
 
                 Spacer(Modifier.height(4.dp))
@@ -602,7 +621,7 @@ private fun AlgorithmPicker(
             )
             Spacer(Modifier.width(5.dp))
             Text(
-                "= CPU 硬件指令加速（本机实测判定）；SHA3 / SM3 为软件实现，CRC32 是校验和、非加密哈希",
+                "= CPU 硬件指令加速（本机实测判定）；SHA3 由内置 native 库（ARMv8.2-SHA3 汇编）加速，SM3 为软件实现；CRC32 是校验和、非加密哈希",
                 fontSize = 10.sp,
                 lineHeight = 14.sp,
                 color = colors.onSurfaceVariant,

@@ -104,7 +104,7 @@ fun SettingsSheet(
 
                 SwitchRow(
                     title = "计算时保持屏幕常亮",
-                    subtitle = "不用任何权限；灭屏后系统会把 CPU 压频（实测 SHA3 会从 1.0 GB/s 掉到 0.25 GB/s）",
+                    subtitle = "不用任何权限；但它只挡\"自动熄屏\"——手动按电源键无效（那种情况看下面两项）",
                     checked = keepScreenOn,
                     onCheckedChange = onKeepScreenOn,
                 )
@@ -112,7 +112,8 @@ fun SettingsSheet(
                 SwitchRow(
                     title = "常驻通知（进度 / 取消）",
                     subtitle = buildString {
-                        append("计算期间挂前台服务：防止被系统冻结、掉频，也能一键取消")
+                        append("长任务时显示进度、可一键取消（前台服务），也能降低被系统冻结的概率")
+                        append("；本机实测：灭屏后仍可能被冻结，故还有下面两项兜底")
                         if (!notifyPermissionGranted) append("\n⚠ 系统通知权限未授予：抽屉里看不到这条通知（服务本身仍会运行）")
                     },
                     checked = notifyProgress,
@@ -130,8 +131,8 @@ fun SettingsSheet(
 
                 SwitchRow(
                     title = "熄屏后继续计算（保持唤醒）",
-                    subtitle = "长任务期间持有部分唤醒锁：CPU 不休眠、系统也更不容易冻结本进程" +
-                        "（本机灭屏冻结的最后对策）；代价是耗电略增",
+                    subtitle = "长任务期间持有部分唤醒锁（CPU 不休眠）。对本机 ROM 的灭屏冻结不保证有效，" +
+                        "属于最后一道保险；代价是耗电略增",
                     checked = keepAwake,
                     onCheckedChange = onKeepAwake,
                 )

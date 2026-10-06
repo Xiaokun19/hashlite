@@ -64,8 +64,18 @@ object RunKeeper {
         HashService.update(context, currentTitle, text, percent)
     }
 
-    /** 结束：收起常驻通知、释放唤醒锁、清掉取消回调，并按设置弹"完成通知"。 */
-    fun end(context: Context, title: String, text: String, error: Boolean = false) {
+    /**
+     * 结束：收起常驻通知、释放唤醒锁、清掉取消回调，并按设置弹"完成通知"。
+     *
+     * [cancelled] 是用户自己按的取消——**不弹完成通知**（他就在看着；弹一条"失败"更莫名其妙）。
+     */
+    fun end(
+        context: Context,
+        title: String,
+        text: String,
+        error: Boolean = false,
+        cancelled: Boolean = false,
+    ) {
         val wasService = serviceStarted
         active = false
         serviceStarted = false
@@ -73,7 +83,7 @@ object RunKeeper {
         releaseWakeLock()
         if (wasService) HashService.stop(context)
         // 只有"用户没在看"时才弹完成通知——正盯着结果卡再弹一条纯属打扰
-        if (AppSettings.of(context).notifyResult && !appVisible) {
+        if (!cancelled && AppSettings.of(context).notifyResult && !appVisible) {
             HashService.notifyResult(context, title, text, error)
         }
     }

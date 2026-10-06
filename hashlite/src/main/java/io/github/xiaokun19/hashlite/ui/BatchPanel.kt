@@ -273,22 +273,27 @@ fun BatchSection(state: BatchUiState) {
             result.onSuccess { report ->
                 state.report = report
                 state.exportAlgorithm = report.results.firstOrNull()?.primaryAlgorithm
-                if (report.cancelled) state.error = "已取消（结果不完整）"
+                val cancelled = report.cancelled
+                if (cancelled) state.error = "已取消（结果不完整）"
                 val hasProblem = report.mismatchedCount > 0 || report.errorCount > 0 || report.missing.isNotEmpty()
                 RunKeeper.end(
                     context,
-                    state.folderName,
+                    when {
+                        cancelled -> "已取消 · ${state.folderName}"
+                        hasProblem -> "⚠ 有文件没通过 · ${state.folderName}"
+                        else -> "✓ 批量校验完成 · ${state.folderName}"
+                    },
                     buildString {
-                        if (report.cancelled) append("已取消 · ")
                         append("匹配 ${report.matchedCount} · 不匹配 ${report.mismatchedCount}")
                         append(" · 缺失 ${report.missing.size}")
                         append(" · ").append(HashParse.formatSpeed(report.aggregateBytesPerSec))
                     },
-                    error = hasProblem,
+                    error = hasProblem && !cancelled,
+                    cancelled = cancelled,
                 )
             }.onFailure {
                 state.error = it.message ?: it.toString()
-                RunKeeper.end(context, state.folderName, "失败：${it.message ?: it}", error = true)
+                RunKeeper.end(context, "✗ 批量校验失败 · ${state.folderName}", it.message ?: "未知错误", error = true)
             }
         }
     }
@@ -322,7 +327,13 @@ fun BatchSection(state: BatchUiState) {
         }
 
         state.error?.let { message ->
-            Text("提示：$message", fontSize = 12.sp, color = MaterialTheme.colorScheme.error)
+            // 用户自己取消的不算"错误"：中性色、不带"提示："前缀
+            val cancelled = message.startsWith("已取消")
+            Text(
+                if (cancelled) message else "提示：$message",
+                fontSize = 12.sp,
+                color = if (cancelled) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.error,
+            )
         }
 
         Text(
