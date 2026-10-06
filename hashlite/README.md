@@ -100,6 +100,8 @@ SM3        徽标=灭   纯软件实现；CPU 有 sm3 指令但平台无实现
   通知渠道与通知文案也跟随 App 内选择（`AppLocale.wrap`），而不是系统语言
 - **三键导航适配**：设置 / 帮助面板底部用 `navigationBarsPadding`，主界面用 `safeDrawingPadding`——
   三键导航栏不会遮挡内容（内容可滚到栏上方）
+- **诊断日志**：崩溃（全局未捕获异常）与非致命错误统一记录；启动后有未看过的报告会在顶部提示
+  （查看 / 分享 / 忽略）；面板支持多份切换与导出（分享、SAF 保存、复制、删除）；设置 → 关于有入口
 - 选文件卡片（未选时是整块可点的"选择文件"区）
 - 算法 chips（**2 列 × 3 行**）+ 每个支持硬件加速的算法右侧一枚 CPU 芯片徽标 + 一行图例
   - 徽标放在 `FilterChip` 自带的 `trailingIcon` 槽，而不是塞进 `label` 的 Row：
@@ -184,6 +186,21 @@ am start -n io.github.xiaokun19.hashlite/.MainActivity -e nativecheck 1
 cat /sdcard/Android/data/io.github.xiaokun19.hashlite/files/nativecheck.txt
 ```
 
+## 诊断日志（崩溃 / 错误报告，`Diagnostics.kt`）
+
+目标是“别的手机上崩了，能把现场寄回来”：
+
+- **崩溃**：`Thread.setDefaultUncaughtExceptionHandler`（在 `Application.onCreate` 里最早挂上）。
+  记录完**仍然交回系统**——进程照常被杀、系统照常弹“已停止”，不吞异常；非致命错误用 `recordError`
+  主动上报（SHA-3 库不可用、读取/导出失败等，少而精）。
+- **一条报告 = 头部（版本/设备/设置/内存）+ 摘要 + 堆栈 + 面包屑**（120 条环形缓冲：
+  启动、native 状态、hash/batch 起止、intent 等）。
+- **存放**：`getExternalFilesDir()/reports/{crash,error}-*.txt`，保留最近 20 份；**不需要任何存储权限**。
+- **查看 / 导出**：启动后有未看过的报告 → 主界面提示卡；面板支持多份切换、分享（系统分享面板）、
+  SAF 保存、复制、删除；设置 → 关于也有入口。分享的即整份报告文本，可直接发给开发者或 AI。
+- **nativeExpected 标记**：构建时注入 meta-data（CI=true / 本地=false），只有“本应带 native 的构建”
+  在库不可用时才记错误，本地开发循环不受干扰。
+
 ## 图标
 
 设计源与生成流水线都在 `icon/`：
@@ -233,7 +250,11 @@ am start -a android.intent.action.VIEW -d content://media/external/file/<id> -t 
 am start -n io.github.xiaokun19.hashlite/.MainActivity -e hwcheck 1     # → hwcheck.txt
 # 无头批量自检：并行度 → 吞吐曲线 + 清单闭环（正向/负向/缺失）
 am start -n io.github.xiaokun19.hashlite/.MainActivity -e batchcheck 1 -e files 16 -e sizeMiB 64 -e workers 1,2,4,6,8
+# 诊断日志自检（写一条错误报告 / 真崩一次；App 已在前台时再加 -f 0x20000000）：
+am start -n io.github.xiaokun19.hashlite/.MainActivity -e errorcheck 1
+am start -n io.github.xiaokun19.hashlite/.MainActivity -e crashcheck 1
 # 报告都在 /sdcard/Android/data/io.github.xiaokun19.hashlite/files/*.txt（shell 可读）
+# 诊断日志在 .../files/reports/{crash,error}-*.txt
 ```
 
 单测覆盖：38 条公开向量（empty / "abc" / 1e6×'a'）、9 种引擎配置与顺序哈希一致、
