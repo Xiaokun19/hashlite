@@ -1,9 +1,12 @@
 package io.github.xiaokun19.hashlite.ui
 
+import android.app.Activity
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
+import android.os.Build
 import android.provider.OpenableColumns
+import android.view.WindowManager
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
@@ -39,6 +42,7 @@ import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -52,6 +56,7 @@ import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontFamily
@@ -60,7 +65,9 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.text.TextStyle
+import io.github.xiaokun19.hashlite.AppSettings
 import io.github.xiaokun19.hashlite.R
+import io.github.xiaokun19.hashlite.RunKeeper
 import io.github.xiaokun19.hashlite.core.AndroidFileSource
 import io.github.xiaokun19.hashlite.core.HashParse
 import io.github.xiaokun19.hashlite.core.HashProgress
@@ -92,6 +99,9 @@ class LiteUiState {
 
     /** 帮助面板是否展开。 */
     var showHelp: Boolean by mutableStateOf(false)
+
+    /** 设置面板是否展开。 */
+    var showSettings: Boolean by mutableStateOf(false)
 
     /** "更多算法"是否展开（默认折叠）。 */
     var showMoreAlgorithms: Boolean by mutableStateOf(false)
@@ -156,6 +166,30 @@ fun LiteScreen(
     var mode by remember { mutableStateOf(HashMode.SINGLE) }
     val batchState = remember { BatchUiState() }
 
+    // ---- 设置（计算体验）：屏幕常亮 / 常驻通知 / 完成通知 ----
+    val appSettings = remember { AppSettings.of(context) }
+    var keepScreenOn by remember { mutableStateOf(appSettings.keepScreenOn) }
+    var notifyProgress by remember { mutableStateOf(appSettings.notifyProgress) }
+    var notifyResult by remember { mutableStateOf(appSettings.notifyResult) }
+    var notifyGranted by remember { mutableStateOf(notificationPermissionGranted(context)) }
+    val permissionLauncher =
+        rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+            notifyGranted = granted
+        }
+
+    fun ensureNotifyPermission() {
+        // Android 13+ 才有 POST_NOTIFICATIONS 运行时权限；低版本恒为已授予
+        if (!notifyGranted) permissionLauncher.launch(android.Manifest.permission.POST_NOTIFICATIONS)
+    }
+
+    // 屏幕常亮：只在"有会话在跑"时点亮（RunKeeper.active 是 Compose 状态），
+    // 任务结束、关掉开关或页面销毁时立刻释放——onDispose 是兜底，防止留下常亮。
+    val view = LocalView.current
+    DisposableEffect(RunKeeper.active, keepScreenOn) {
+        view.keepScreenOn = RunKeeper.active && keepScreenOn
+        onDispose { view.keepScreenOn = false }
+    }
+
     val picker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         if (uri != null) {
             runCatching {
@@ -183,6 +217,13 @@ fun LiteScreen(
         state.error = null
         val hasher = LiteHasher()
         engine = hasher
+        // 大活（≥64MB 或大小未知）才拉前台服务：防杀、防降频；小文件只保屏幕常亮
+        RunKeeper.begin(
+            context,
+            state.fileName,
+            longTask = state.fileSize <= 0L || state.fileSize >= RunKeeper.LONG_TASK_BYTES,
+        )
+        RunKeeper.setCancelHook { hasher.cancel() } // 通知栏上的"取消"
         scope.launch {
             val result = withContext(Dispatchers.Default) {
                 runCatching {
@@ -197,6 +238,17 @@ fun LiteScreen(
                         if (now - lastUpdate > 100_000_000L || progress.fraction >= 1f) {
                             lastUpdate = now
                             state.progress = progress
+                            RunKeeper.progress(
+                                context,
+                                buildString {
+                                    append(HashParse.formatBytes(progress.doneBytes))
+                                    if (progress.totalBytes > 0L) {
+                                        append(" / ").append(HashParse.formatBytes(progress.totalBytes))
+                                    }
+                                    append(" · ").append(HashParse.formatSpeed(progress.bytesPerSec))
+                                },
+                                percent = if (progress.totalBytes > 0L) (progress.fraction * 100).toInt() else null,
+                            )
                         }
                     }
                 }
@@ -207,7 +259,11 @@ fun LiteScreen(
             result.onSuccess { outcome ->
                 state.outcome = outcome
                 if (outcome.error != null) state.error = outcome.error
-            }.onFailure { state.error = it.message ?: it.toString() }
+                RunKeeper.end(context, state.fileName, hashSummary(outcome), error = !outcome.success)
+            }.onFailure {
+                state.error = it.message ?: it.toString()
+                RunKeeper.end(context, state.fileName, "失败：${it.message ?: it}", error = true)
+            }
         }
     }
 
@@ -256,6 +312,7 @@ fun LiteScreen(
                 flags = cpuFlags,
                 ratios = state.accelRatios,
                 onHelp = { state.showHelp = true },
+                onSettings = { state.showSettings = true },
             )
 
             ModeSwitcher(mode = mode, onSelect = { mode = it })
@@ -317,12 +374,52 @@ fun LiteScreen(
                     modifier = Modifier.align(Alignment.BottomCenter),
                 )
             }
+
+            // 设置面板：同一套浮层语言（遮罩点击关闭）
+            if (state.showSettings) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(Color.Black.copy(alpha = 0.42f))
+                        .clickable(
+                            interactionSource = remember { MutableInteractionSource() },
+                            indication = null,
+                        ) { state.showSettings = false },
+                )
+                SettingsSheet(
+                    keepScreenOn = keepScreenOn,
+                    notifyProgress = notifyProgress,
+                    notifyResult = notifyResult,
+                    notifyPermissionGranted = notifyGranted,
+                    onKeepScreenOn = {
+                        keepScreenOn = it
+                        appSettings.keepScreenOn = it
+                    },
+                    onNotifyProgress = { value ->
+                        notifyProgress = value
+                        appSettings.notifyProgress = value
+                        if (value) ensureNotifyPermission()
+                    },
+                    onNotifyResult = { value ->
+                        notifyResult = value
+                        appSettings.notifyResult = value
+                        if (value) ensureNotifyPermission()
+                    },
+                    onClose = { state.showSettings = false },
+                    modifier = Modifier.align(Alignment.BottomCenter),
+                )
+            }
         }
     }
 }
 
 @Composable
-private fun Header(flags: HardwareAcceleration.CpuFlags, ratios: Map<LiteAlgorithm, Double>, onHelp: () -> Unit) {
+private fun Header(
+    flags: HardwareAcceleration.CpuFlags,
+    ratios: Map<LiteAlgorithm, Double>,
+    onHelp: () -> Unit,
+    onSettings: () -> Unit,
+) {
     val colors = MaterialTheme.colorScheme
     Row(verticalAlignment = Alignment.CenterVertically) {
         Column(
@@ -336,6 +433,19 @@ private fun Header(flags: HardwareAcceleration.CpuFlags, ratios: Map<LiteAlgorit
                 color = colors.onSurfaceVariant,
             )
         }
+        // 设置入口：齿轮（计算体验：屏幕常亮 / 通知）
+        Box(
+            modifier = Modifier
+                .size(38.dp)
+                .clip(CircleShape)
+                .background(colors.primary.copy(alpha = 0.10f))
+                .clickable(onClick = onSettings),
+            contentAlignment = Alignment.Center,
+        ) {
+            Text("⚙", fontSize = 17.sp, color = colors.primary)
+        }
+        Spacer(Modifier.width(8.dp))
+
         // 帮助入口：圆底问号，和文件卡里的"＋"同一套语言
         Box(
             modifier = Modifier
@@ -765,6 +875,19 @@ private fun CompareCard(state: LiteUiState) {
             }
         }
     }
+}
+
+/** 完成通知里的一句话结果：算法 + 值前缀 + 耗时/速度。 */
+private fun hashSummary(outcome: io.github.xiaokun19.hashlite.core.HashOutcome): String = buildString {
+    val first = outcome.hexByAlgorithm.entries.firstOrNull()
+    if (first != null) {
+        append(first.key.label).append(' ').append(first.value.take(16)).append('…')
+        if (outcome.hexByAlgorithm.size > 1) append("（共 ${outcome.hexByAlgorithm.size} 个算法）")
+    } else {
+        append(if (outcome.error != null) outcome.error else "完成")
+    }
+    append(" · ").append(HashParse.formatDuration(outcome.elapsedNanos))
+    append(" · ").append(HashParse.formatSpeed(outcome.bytesPerSec))
 }
 
 private fun queryName(context: Context, uri: Uri): String {

@@ -69,6 +69,17 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    override fun onStart() {
+        super.onStart()
+        // 前台可见时不必再弹"完成通知"（结果就在眼前）
+        RunKeeper.appVisible = true
+    }
+
+    override fun onStop() {
+        RunKeeper.appVisible = false
+        super.onStop()
+    }
+
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         setIntent(intent)
@@ -134,9 +145,33 @@ class MainActivity : ComponentActivity() {
     /** native Keccak 自检：报告写到 `getExternalFilesDir()/nativecheck.txt`。 */
     private fun runNativeCheckAndExit() {
         val sizeMiB = intent?.getStringExtra(EXTRA_SIZE_MIB)?.toIntOrNull() ?: 64
+        // 持续负载实验：-e sustain 30 [-e fgs 1] —— 验证前台服务能不能扛住系统压频
+        val sustainSeconds = intent?.getStringExtra(EXTRA_SUSTAIN)?.toIntOrNull() ?: 0
+        val useFgs = intent?.getStringExtra(EXTRA_FGS) == "1"
         lifecycleScope.launch {
             val base = getExternalFilesDir(null) ?: filesDir
-            val report = withContext(Dispatchers.Default) { NativeSelfCheck.run(sizeMiB) }
+            if (sustainSeconds > 0 && useFgs) {
+                RunKeeper.begin(this@MainActivity, "持续负载测试", longTask = true)
+                RunKeeper.setCancelHook { NativeSelfCheck.requestStop() }
+                RunKeeper.progress(this@MainActivity, "准备中…", null)
+            }
+            val report = withContext(Dispatchers.Default) {
+                buildString {
+                    append(NativeSelfCheck.run(sizeMiB))
+                    if (sustainSeconds > 0) {
+                        appendLine()
+                        appendLine("--- 持续负载 ${sustainSeconds}s（前台服务=${if (useFgs) "开" else "关"}）---")
+                        append(
+                            NativeSelfCheck.sustain(sustainSeconds) { percent, text ->
+                                RunKeeper.progress(this@MainActivity, text, percent)
+                            },
+                        )
+                    }
+                }
+            }
+            if (sustainSeconds > 0 && useFgs) {
+                RunKeeper.end(this@MainActivity, "持续负载测试", "完成", error = false)
+            }
             val target = File(base, "nativecheck.txt")
             runCatching { target.writeText(report) }
             Log.i(TAG, report)
@@ -207,6 +242,8 @@ class MainActivity : ComponentActivity() {
         const val EXTRA_HWCHECK = "hwcheck"
         const val EXTRA_BATCHCHECK = "batchcheck"
         const val EXTRA_NATIVECHECK = "nativecheck"
+        const val EXTRA_SUSTAIN = "sustain"
+        const val EXTRA_FGS = "fgs"
         const val EXTRA_FILES = "files"
         const val EXTRA_SIZE_MIB = "sizeMiB"
         const val EXTRA_WORKERS = "workers"

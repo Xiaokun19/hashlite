@@ -44,6 +44,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import io.github.xiaokun19.hashlite.RunKeeper
 import io.github.xiaokun19.hashlite.core.AndroidBatchFile
 import io.github.xiaokun19.hashlite.core.BatchFile
 import io.github.xiaokun19.hashlite.core.BatchHasher
@@ -243,11 +244,26 @@ fun BatchSection(state: BatchUiState) {
         state.error = null
         val hasher = BatchHasher(workers = state.workers)
         engine = hasher
+        // 大活（总量 ≥64MB）才拉前台服务：防杀、防降频；小批量只保屏幕常亮
+        RunKeeper.begin(
+            context,
+            state.folderName,
+            longTask = state.totalBytes >= RunKeeper.LONG_TASK_BYTES,
+        )
+        RunKeeper.setCancelHook { hasher.cancel() } // 通知栏上的"取消"
         scope.launch {
             val result = withContext(Dispatchers.Default) {
                 runCatching {
                     hasher.run(tasks, state.checksumList, state::algorithmsFor) { progress ->
                         state.progress = progress
+                        RunKeeper.progress(
+                            context,
+                            buildString {
+                                append("已完成 ${progress.filesDone}/${progress.filesTotal} 个文件")
+                                append(" · 聚合 ").append(HashParse.formatSpeed(progress.aggregateBytesPerSec))
+                            },
+                            percent = if (progress.bytesTotal > 0L) (progress.fraction * 100).toInt() else null,
+                        )
                     }
                 }
             }
@@ -258,7 +274,22 @@ fun BatchSection(state: BatchUiState) {
                 state.report = report
                 state.exportAlgorithm = report.results.firstOrNull()?.primaryAlgorithm
                 if (report.cancelled) state.error = "已取消（结果不完整）"
-            }.onFailure { state.error = it.message ?: it.toString() }
+                val hasProblem = report.mismatchedCount > 0 || report.errorCount > 0 || report.missing.isNotEmpty()
+                RunKeeper.end(
+                    context,
+                    state.folderName,
+                    buildString {
+                        if (report.cancelled) append("已取消 · ")
+                        append("匹配 ${report.matchedCount} · 不匹配 ${report.mismatchedCount}")
+                        append(" · 缺失 ${report.missing.size}")
+                        append(" · ").append(HashParse.formatSpeed(report.aggregateBytesPerSec))
+                    },
+                    error = hasProblem,
+                )
+            }.onFailure {
+                state.error = it.message ?: it.toString()
+                RunKeeper.end(context, state.folderName, "失败：${it.message ?: it}", error = true)
+            }
         }
     }
 

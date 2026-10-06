@@ -138,6 +138,66 @@ object NativeSelfCheck {
         return System.nanoTime() - t0
     }
 
+    /**
+     * 持续负载实验：在 [seconds] 秒内反复哈希同一块数据，逐轮报速度。
+     *
+     * 用途：验证**前台服务能不能扛住系统的压频**——没有前台服务时，App 不交互 1~3 秒后
+     * 打印前 8 轮 + 每 10 轮 +最后的汇总，方便直接看出"什么时候开始掉"。
+     */
+    fun sustain(seconds: Int, sizeMiB: Int = 64, onProgress: ((percent: Int, text: String) -> Unit)? = null): String {
+        if (!NativeKeccak.loaded) return "native 未加载，跳过持续负载"
+        val n = sizeMiB * 1024 * 1024
+        val data = ByteArray(n)
+        var seed = 12345
+        for (i in 0 until n) {
+            seed = seed * 1103515245 + 12345
+            data[i] = (seed ushr 16).toByte()
+        }
+
+        val sb = StringBuilder()
+        sb.appendLine("变体=${NativeKeccak.variantName()} · 前台服务=${if (RunKeeper.serviceStarted) "开" else "关"}")
+        val start = System.nanoTime()
+        var round = 0
+        var best = 0.0
+        var worst = Double.MAX_VALUE
+        var sum = 0.0
+        while (System.nanoTime() - start < seconds * 1_000_000_000L && !stopRequested) {
+            round++
+            val speed = mbps(hashOnce(data, native = true), n)
+            best = maxOf(best, speed)
+            worst = minOf(worst, speed)
+            sum += speed
+            if (round <= 8 || round % 10 == 0) {
+                sb.appendLine(String.format(Locale.US, "  第%3d轮 %8.1f MB/s", round, speed))
+            }
+            val elapsedSec = ((System.nanoTime() - start) / 1_000_000_000L).toInt()
+            onProgress?.invoke(
+                (elapsedSec * 100 / seconds.coerceAtLeast(1)).coerceIn(0, 100),
+                String.format(Locale.US, "第%d轮 · %.0f MB/s", round, speed),
+            )
+        }
+        val elapsed = (System.nanoTime() - start) / 1e9
+        if (round > 0) {
+            sb.appendLine(
+                String.format(
+                    Locale.US,
+                    "  共 %d 轮 / %.1fs · 最好 %.1f · 最差 %.1f · 平均 %.1f MB/s",
+                    round, elapsed, best, worst, sum / round,
+                ),
+            )
+        }
+        if (stopRequested) sb.appendLine("  （被通知栏取消）")
+        return sb.toString()
+    }
+
+    /** 持续负载的停止标志（通知栏"取消"会置位）。 */
+    @Volatile
+    private var stopRequested = false
+
+    fun requestStop() {
+        stopRequested = true
+    }
+
     private fun mbps(nanos: Long, bytes: Int): Double =
         if (nanos <= 0L) 0.0 else bytes.toDouble() / (nanos / 1_000_000_000.0) / (1024.0 * 1024.0)
 
