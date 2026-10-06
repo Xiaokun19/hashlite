@@ -171,6 +171,7 @@ fun LiteScreen(
     var keepScreenOn by remember { mutableStateOf(appSettings.keepScreenOn) }
     var notifyProgress by remember { mutableStateOf(appSettings.notifyProgress) }
     var notifyResult by remember { mutableStateOf(appSettings.notifyResult) }
+    var keepAwake by remember { mutableStateOf(appSettings.keepAwake) }
     var notifyGranted by remember { mutableStateOf(notificationPermissionGranted(context)) }
     var batteryOk by remember { mutableStateOf(batteryUnrestricted(context)) }
     val permissionLauncher =
@@ -398,6 +399,7 @@ fun LiteScreen(
                     notifyResult = notifyResult,
                     notifyPermissionGranted = notifyGranted,
                     batteryUnrestricted = batteryOk,
+                    keepAwake = keepAwake,
                     onKeepScreenOn = {
                         keepScreenOn = it
                         appSettings.keepScreenOn = it
@@ -411,6 +413,12 @@ fun LiteScreen(
                         notifyResult = value
                         appSettings.notifyResult = value
                         if (value) ensureNotifyPermission()
+                    },
+                    onKeepAwake = { value ->
+                        keepAwake = value
+                        appSettings.keepAwake = value
+                        // 打开时若正在跑长任务，立刻补一把唤醒锁（不用等下一次开始）
+                        if (value && RunKeeper.active) RunKeeper.refreshWakeLock(context)
                     },
                     onRequestUnrestricted = { requestBatteryUnrestricted(context) },
                     onClose = { state.showSettings = false },

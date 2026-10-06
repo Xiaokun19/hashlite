@@ -11,6 +11,10 @@
     <!-- 申请"不受电池优化限制"：本机 ROM 在灭屏后会冻结后台 App（实测连前台服务都冻），
     <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
 
+    <!-- 部分唤醒锁：长任务期间保持 CPU 不休眠（也是"别把我冻了"的信号）。
+         见 RunKeeper.acquireWakeLock / AppSettings.keepAwake。 -->
+    <uses-permission android:name="android.permission.WAKE_LOCK" />
+
     <application
         android:allowBackup="true"
         android:dataExtractionRules="@xml/data_extraction_rules"

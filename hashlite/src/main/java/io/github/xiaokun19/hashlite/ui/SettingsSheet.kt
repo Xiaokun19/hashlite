@@ -47,9 +47,11 @@ fun SettingsSheet(
     notifyResult: Boolean,
     notifyPermissionGranted: Boolean,
     batteryUnrestricted: Boolean,
+    keepAwake: Boolean,
     onKeepScreenOn: (Boolean) -> Unit,
     onNotifyProgress: (Boolean) -> Unit,
     onNotifyResult: (Boolean) -> Unit,
+    onKeepAwake: (Boolean) -> Unit,
     onRequestUnrestricted: () -> Unit,
     onClose: () -> Unit,
     modifier: Modifier = Modifier,
@@ -124,6 +126,14 @@ fun SettingsSheet(
                     checked = notifyResult,
                     onCheckedChange = onNotifyResult,
                     warn = !notifyPermissionGranted && notifyResult,
+                )
+
+                SwitchRow(
+                    title = "熄屏后继续计算（保持唤醒）",
+                    subtitle = "长任务期间持有部分唤醒锁：CPU 不休眠、系统也更不容易冻结本进程" +
+                        "（本机灭屏冻结的最后对策）；代价是耗电略增",
+                    checked = keepAwake,
+                    onCheckedChange = onKeepAwake,
                 )
 
                 // 电池优化白名单：灭屏冻结的正解之一（本机 ROM 连前台服务都会冻）
