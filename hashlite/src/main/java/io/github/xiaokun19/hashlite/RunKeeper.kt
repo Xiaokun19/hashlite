@@ -25,6 +25,9 @@ object RunKeeper {
 
     private var lastNotifyAt = 0L
 
+    /** 本次会话的标题（文件名/目录名），进度更新时要带上，否则通知标题会回退成默认值。 */
+    private var currentTitle = ""
+
     fun setCancelHook(hook: (() -> Unit)?) {
         cancelHook = hook
     }
@@ -43,6 +46,7 @@ object RunKeeper {
      */
     fun begin(context: Context, title: String, longTask: Boolean = true) {
         active = true
+        currentTitle = title
         lastNotifyAt = 0L
         serviceStarted = longTask && AppSettings.of(context).notifyProgress
         if (serviceStarted) HashService.start(context, title)
@@ -54,7 +58,8 @@ object RunKeeper {
         val now = SystemClock.elapsedRealtime()
         if (now - lastNotifyAt < 500L) return
         lastNotifyAt = now
-        HashService.update(context, text, percent)
+        // 标题要一起带上：HashService 每次 update 都会重建通知，不带就回退成默认标题
+        HashService.update(context, currentTitle, text, percent)
     }
 
     /** 结束：收起常驻通知、清掉取消回调，并按设置弹"完成通知"。 */

@@ -172,10 +172,16 @@ fun LiteScreen(
     var notifyProgress by remember { mutableStateOf(appSettings.notifyProgress) }
     var notifyResult by remember { mutableStateOf(appSettings.notifyResult) }
     var notifyGranted by remember { mutableStateOf(notificationPermissionGranted(context)) }
+    var batteryOk by remember { mutableStateOf(batteryUnrestricted(context)) }
     val permissionLauncher =
         rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
             notifyGranted = granted
         }
+
+    // 每次打开设置面板时重读"电池优化白名单"状态（用户可能刚从系统页回来）
+    LaunchedEffect(state.showSettings) {
+        if (state.showSettings) batteryOk = batteryUnrestricted(context)
+    }
 
     fun ensureNotifyPermission() {
         // Android 13+ 才有 POST_NOTIFICATIONS 运行时权限；低版本恒为已授予
@@ -391,6 +397,7 @@ fun LiteScreen(
                     notifyProgress = notifyProgress,
                     notifyResult = notifyResult,
                     notifyPermissionGranted = notifyGranted,
+                    batteryUnrestricted = batteryOk,
                     onKeepScreenOn = {
                         keepScreenOn = it
                         appSettings.keepScreenOn = it
@@ -405,6 +412,7 @@ fun LiteScreen(
                         appSettings.notifyResult = value
                         if (value) ensureNotifyPermission()
                     },
+                    onRequestUnrestricted = { requestBatteryUnrestricted(context) },
                     onClose = { state.showSettings = false },
                     modifier = Modifier.align(Alignment.BottomCenter),
                 )

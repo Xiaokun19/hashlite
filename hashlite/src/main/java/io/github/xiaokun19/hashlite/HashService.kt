@@ -135,16 +135,23 @@ class HashService : Service() {
             runCatching { context.startForegroundService(intent) }
         }
 
-        fun update(context: Context, text: String, percent: Int?) {
+        fun update(context: Context, title: String, text: String, percent: Int?) {
             val intent = Intent(context, HashService::class.java).setAction(ACTION_UPDATE)
+                .putExtra(EXTRA_TITLE, title)
                 .putExtra(EXTRA_TEXT, text)
                 .putExtra(EXTRA_PERCENT, percent ?: -1)
             runCatching { context.startForegroundService(intent) }
         }
 
-        /** 停止常驻通知（服务不在跑时是安全的空操作）。 */
+        /**
+         * 停止常驻通知。
+         *
+         * 注意：**只调 `stopService` 是不够的**——实测过"服务已经没了、通知还挂在抽屉里"
+         * （本机 ROM 清 ServiceRecord 时不撤前台通知）。所以这里再显式 cancel 一次。
+         */
         fun stop(context: Context) {
             runCatching { context.stopService(Intent(context, HashService::class.java)) }
+            runCatching { NotificationManagerCompat.from(context).cancel(NOTIF_ONGOING) }
         }
 
         /** 结束提醒：普通通知，可滑掉、点了回 App。 */

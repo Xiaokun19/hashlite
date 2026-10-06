@@ -46,9 +46,11 @@ fun SettingsSheet(
     notifyProgress: Boolean,
     notifyResult: Boolean,
     notifyPermissionGranted: Boolean,
+    batteryUnrestricted: Boolean,
     onKeepScreenOn: (Boolean) -> Unit,
     onNotifyProgress: (Boolean) -> Unit,
     onNotifyResult: (Boolean) -> Unit,
+    onRequestUnrestricted: () -> Unit,
     onClose: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -124,6 +126,35 @@ fun SettingsSheet(
                     warn = !notifyPermissionGranted && notifyResult,
                 )
 
+                // 电池优化白名单：灭屏冻结的正解之一（本机 ROM 连前台服务都会冻）
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 6.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text("不受电池优化限制", fontSize = 14.sp, fontWeight = FontWeight.Medium)
+                        Text(
+                            if (batteryUnrestricted) {
+                                "已加入白名单：灭屏 / 后台不会被系统冻结"
+                            } else {
+                                "未加入：本机 ROM 灭屏后会冻结 App（实测连前台服务也会被冻住，" +
+                                    "长任务会停在半路）——建议加入白名单"
+                            },
+                            fontSize = 11.sp,
+                            lineHeight = 15.sp,
+                            color = if (batteryUnrestricted) colors.onSurfaceVariant else colors.error,
+                        )
+                    }
+                    Spacer(Modifier.width(10.dp))
+                    if (batteryUnrestricted) {
+                        Text("✓", fontSize = 15.sp, color = colors.primary)
+                    } else {
+                        TextButton(onClick = onRequestUnrestricted) { Text("去设置", fontSize = 13.sp) }
+                    }
+                }
+
                 Spacer(Modifier.height(14.dp))
                 SectionTitle("关于")
 
@@ -198,3 +229,25 @@ fun notificationPermissionGranted(context: Context): Boolean =
     } else {
         context.checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED
     }
+
+/** 是否已在"不受电池优化限制"白名单里（拿不到 PowerManager 时按"是"处理，避免误报）。 */
+fun batteryUnrestricted(context: Context): Boolean = runCatching {
+    val pm = context.getSystemService(android.os.PowerManager::class.java)
+    pm == null || pm.isIgnoringBatteryOptimizations(context.packageName)
+}.getOrDefault(true)
+
+/**
+ * 拉起系统的"忽略电池优化"授权页。
+ *
+ * 为什么需要它：本机 ROM 在灭屏后会冻结 App——实测**连前台服务也一起冻**
+ * （长任务跑一半停住、CPU 不再推进）。白名单是唯一能改变这个行为的开关。
+ */
+fun requestBatteryUnrestricted(context: Context) {
+    runCatching {
+        context.startActivity(
+            android.content.Intent(android.provider.Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS)
+                .setData(android.net.Uri.parse("package:" + context.packageName))
+                .addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK),
+        )
+    }
+}
