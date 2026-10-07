@@ -1,67 +1,76 @@
-# 哈希工具（HashLite）
+# HashLite（哈希计算）
 
-Android 文件哈希计算 / 校验工具，本仓库**只有一个模块**：
+[![CI](https://github.com/Xiaokun19/hashlite/actions/workflows/ci.yml/badge.svg)](https://github.com/Xiaokun19/hashlite/actions/workflows/ci.yml)
 
-| 模块 | 应用名 / 包名 | 定位 |
+轻量、干净的 Android 文件哈希计算 / 校验应用：10 个算法（含 SHA-3、SM3、CRC32）、
+批量校验与多文件并行哈希。**不申请存储权限、不联网**，所有计算在本地完成，支持 Android 7.0+。
+
+## 特性
+
+- **算法（10 个）**：MD5 / SHA-1 / SHA-224 / 256 / 384 / 512 / SHA3-256 / SHA3-512 / SM3 / CRC32
+  （SHA-3 内置 ARMv8.2 汇编实现，不可用时自动回退纯软件；CRC32 是校验和、非加密哈希）
+- **单文件**：支持从其它应用「分享 / 打开」直达；流式哈希（4 MiB 块 + 预读线程），
+  实时进度 / 速度 / 剩余时间；结果点按即复制；可粘贴任意格式校验值直接比对
+- **批量校验**：整目录（含子目录）批量；可导入 .md5 / .sha1 / .sha256 / .sfv 清单比对；
+  1–8 路并行；判定「匹配 / 不匹配 / 缺失 / 未列出 / 读取失败」；可导出校验文件
+- **硬件加速**：自动检测 CPU 指令，并用微基准实测验证（「有指令 ≠ 用上指令」）
+- **外观与语言**：浅色 / 深色 / 跟随系统；中文 / English
+- **隐私**：文件经 SAF 只读访问，不申请存储权限；不申请网络权限，无任何数据上传
+- **诊断日志**：崩溃与非致命错误自动记录，可一键导出，便于反馈问题
+
+## 截图
+
+| 单文件 | 批量校验 | 深色模式 |
 |---|---|---|
-| `:hashlite` | 哈希计算 / `io.github.xiaokun19.hashlite` | 纯净版：10 个常用算法 + 批量校验 / 并行哈希，界面为主 |
+| ![单文件](docs/screenshots/main.png) | ![批量校验](docs/screenshots/batch.png) | ![深色模式](docs/screenshots/dark.png) |
 
-> **远程仓库**：<https://github.com/Xiaokun19/hashlite> ·
-> **CI**：`.github/workflows/ci.yml`——push / PR 时在 ubuntu-latest 上跑 **48 个单测 + Debug APK**（APK 作为 artifact）。
+## 性能参考
 
-详细设计（算法表、硬件加速两层检测、引擎、批量校验、图标流水线、全部实测数据）见 **[`hashlite/README.md`](hashlite/README.md)**。
+内存基准，数据来自项目测试机（不同机型数值会浮动）：
 
-> **关于诊断版**：早期还有一个“诊断版”（15 算法 + 瓶颈判定 + 温控轨迹），用于性能研究，**未包含在本仓库中**——
-> 这里只保留纯净版这一个模块。
+- 单文件 SHA-256：约 1.5–2.7 GB/s（硬件指令）
+- 多文件并行：8 路聚合约 7.35 GB/s（16 × 64 MiB，页缓存命中）
+- SHA3-256：内置汇编约 0.7–1.0 GB/s；纯软件回退约 0.3 GB/s
 
----
+测量条件与完整数据见设计文档 → [`hashlite/README.md`](hashlite/README.md)
 
-## 构建 / 测试
+## 安装
 
-```bash
-./gradlew :hashlite:test :hashlite:assembleDebug
-```
+目前尚未提供正式发布版，可自行构建（见下）。
+仓库的 CI 会为每次提交构建 Debug APK，可从 GitHub Actions 的当次运行下载 Artifacts。
+Debug 版使用公开的共享调试签名，可与本机构建互相覆盖安装；正式版将使用独立签名。
 
-- **ARM64 上编 APK 必须先** `./setup_android_env.sh`（把 ARM64 版 aapt2 装到 `/root/.operit-tools/aapt2`，
-  由 `gradle.properties` 的 `android.aapt2FromMavenOverride` 指过去）；文件丢了会**硬失败**，重跑脚本即可。
-- 环境：JDK 17 / Android SDK `/root/Android`（platforms;android-35）/ Gradle 9.1 wrapper / AGP 9.0.0 /
-  Kotlin 2.3.10 / Compose BOM 2026.01.01；minSdk 24 / compileSdk 35 / targetSdk 35。
-- 依赖只有 BouncyCastle（`bcprov-jdk18on`，SHA-3 / SM3 用），版本在根 `gradle/libs.versions.toml` 统一管。
-- **签名**：仓库**不含任何签名密钥**。克隆后直接编译会使用你机器的默认 debug 签名；
-  维护者 CI 产物使用共享 debug key（仅存于 Actions Secret）。正式版（Release）将使用独立的
-  release key（同样只存于 Secrets）——**debug 版与正式版签名不同、互不覆盖**。
+## 构建
 
-安装到设备（`adb`）：
+- 要求：JDK 17；Android SDK（platforms;android-35）
+- `./gradlew :hashlite:test :hashlite:assembleDebug`（48 个单元测试 + APK）
+- native（SHA-3 汇编）默认不在本地编译，由 CI 以 `-Phashlite.native=true` 构建；
+  本地构建自动回退纯软件实现，功能不受影响
+- 在 ARM64 开发机上构建需先运行 `./setup_android_env.sh`（准备本机 aapt2）
 
-```bash
-adb install -r hashlite/build/outputs/apk/debug/hashlite-debug.apk
-# 个别设备可能需要先从 /data/local/tmp 中转：
-# adb push hashlite/build/outputs/apk/debug/hashlite-debug.apk /data/local/tmp/ \
-#   && adb shell pm install -r /data/local/tmp/hashlite-debug.apk
-```
+## 项目结构
 
-## 无头入口（不用点屏幕，报告写到 App 外部目录，shell 可读）
-
-```bash
-# 硬件加速检测报告 → hwcheck.txt
-am start -n io.github.xiaokun19.hashlite/.MainActivity -e hwcheck 1
-# 批量并行自检：并行度 → 吞吐曲线 + 清单闭环（正向 / 故意改坏 / 缺失）→ batchcheck.txt
-am start -n io.github.xiaokun19.hashlite/.MainActivity -e batchcheck 1 -e files 16 -e sizeMiB 64 -e workers 1,2,4,6,8
-# 报告位置
-/sdcard/Android/data/io.github.xiaokun19.hashlite/files/
-```
-
-## 仓库里的其它文档
-
-| 文件 | 作用 |
+| 路径 | 说明 |
 |---|---|
-| `hashlite/README.md` | 纯净版完整设计文档（先看这个） |
-| `setup_android_env.sh` | ARM64 aapt2 与构建环境初始化 |
-| `gradle/libs.versions.toml` | 依赖与插件版本目录 |
+| `hashlite/` | 应用模块（本项目唯一模块） |
+| `hashlite/README.md` | 设计文档：算法、加速检测、流式引擎、批量并行、实测数据 |
+| `.github/workflows/ci.yml` | CI：单元测试 + 构建（含 native） |
+| `tools/aapt2/` | ARM64 开发环境用 aapt2 |
+| `LICENSES/` · `THIRD_PARTY_NOTICES.md` | 第三方许可声明 |
+
+## 已知限制
+
+- 部分定制 ROM 在手动锁屏后会冻结后台计算；前台服务 / 唤醒锁 / 电池白名单只能缓解
+- SM3 为纯软件实现（未做指令加速）
+- 目前仅提供 Debug 构建；正式签名发布尚未提供
+
+## 致谢与开发说明
+
+- 本项目在 Android 端完成开发，借助 [Operit](https://github.com/AAswordman/Operit) 平台的
+  AI 助手编写代码与文档；需求、设计取舍与测试验收由维护者负责。
+- SHA-3 的 ARMv8 汇编来自 OpenSSL 3.0.13（Apache-2.0），详见 `THIRD_PARTY_NOTICES.md`。
 
 ## 许可证
 
-本项目以 **MIT** 协议开源（见 [`LICENSE`](LICENSE)）。
-
-随仓库携带的 vendored OpenSSL 汇编与运行期依赖（AndroidX / Bouncy Castle）的许可说明，
-见 [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md) 与 [`LICENSES/`](LICENSES/)。
+MIT（见 [`LICENSE`](LICENSE)）。第三方组件与其许可见
+[`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md) 与 [`LICENSES/`](LICENSES/)。
