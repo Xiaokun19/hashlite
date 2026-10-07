@@ -150,14 +150,14 @@
     <string name="settings_keep_screen_on">计算时保持屏幕常亮</string>
     <string name="settings_keep_screen_on_sub">不用任何权限；但它只挡“自动熄屏”——手动按电源键无效（那种情况看下面两项）</string>
     <string name="settings_notify_progress">常驻通知（进度 / 取消）</string>
-    <string name="settings_notify_progress_sub">长任务时显示进度、可一键取消（前台服务），也能降低被系统冻结的概率；本机实测：灭屏后仍可能被冻结，故还有下面两项兜底</string>
+    <string name="settings_notify_progress_sub">长任务时显示进度、可一键取消（前台服务），也能降低被系统冻结的概率；部分定制 ROM 实测灭屏后仍可能冻结，故还有下面两项兜底</string>
     <string name="settings_notify_perm_warning">\n⚠ 系统通知权限未授予：抽屉里看不到这条通知（服务本身仍会运行）</string>
     <string name="settings_notify_result">完成后通知</string>
     <string name="settings_notify_result_sub">成功 / 校验不通过 / 失败时提醒一次，可点开回到 App</string>
     <string name="settings_keep_awake">熄屏后继续计算（保持唤醒）</string>
-    <string name="settings_keep_awake_sub">长任务期间持有部分唤醒锁（CPU 不休眠）。对本机 ROM 的灭屏冻结不保证有效，属于最后一道保险；代价是耗电略增</string>
+    <string name="settings_keep_awake_sub">长任务期间持有部分唤醒锁（CPU 不休眠）。对部分定制 ROM 的灭屏冻结不保证有效，属于最后一道保险；代价是耗电略增</string>
     <string name="settings_battery">不受电池优化限制</string>
-    <string name="settings_battery_on">已加入白名单：降低被冻结的概率（本机 ROM 行为激进，不保证 100%）</string>
+    <string name="settings_battery_on">已加入白名单：降低被冻结的概率（部分定制 ROM 行为激进，不保证 100%）</string>
     <string name="settings_battery_off">未加入：灭屏 / 后台可能被系统冻结（实测连前台服务也会被冻住）——建议加入白名单</string>
     <string name="action_go_settings">去设置</string>
 
@@ -192,23 +192,23 @@
     <string name="help_algo_sha1_note">同样已被实际攻破（2017 年 SHAttered），新场景不要用</string>
     <string name="help_algo_sha256_note">目前最通用、最稳妥的选择</string>
     <string name="help_algo_sha2_note">SHA-2 家族的不同档位；512 内部用 64 位字，结构不同</string>
-    <string name="help_algo_sha3_note">新一代标准（Keccak）；本应用内置 ARMv8.2 汇编实现，约 0.7–1.0 GB/s（回退纯软件时约 0.3 GB/s）</string>
+    <string name="help_algo_sha3_note">新一代标准（Keccak）；本应用内置 ARMv8.2 汇编实现，在支持的设备上约 0.7–1.0 GB/s（回退纯软件时约 0.3 GB/s）</string>
     <string name="help_algo_sm3_note">中国国密标准，强度与 SHA-256 相当；本应用为纯软件实现（未做指令加速）</string>
     <string name="help_algo_crc32_note">检错用校验和（.sfv 清单常见）；不是加密哈希，不能用来防篡改</string>
     <string name="help_collision_body">所谓“碰撞”，就是两个不同的文件算出同一个指纹。能做碰撞不等于能反推文件内容，但对“防篡改”这个用途来说，已经足够致命。</string>
 
     <string name="help_hw_title">硬件加速是什么意思</string>
     <string name="help_hw_intro">现代 CPU（ARM）里有一组专门“算哈希”的指令。有指令、且实现真的用上了，算法旁才会亮起 CPU 徽标——本应用不只看 CPU 有没有指令，还会实测“平台实现是不是真的更快”，两层都过才亮。</string>
-    <string name="help_hw_bench_intro">本机实测（内存基准，已剔除磁盘因素）：</string>
+    <string name="help_hw_bench_intro">参考数据（来自项目测试机；内存基准、已剔除磁盘因素）：</string>
     <string name="help_hw_note_native">硬件指令</string>
     <string name="help_hw_sha3_value">≈ 0.7–1.0 GB/s</string>
     <string name="help_hw_sha3_note">内置汇编（EOR3 指令）；没库时回退纯软件 ≈0.3 GB/s</string>
-    <string name="help_hw_meaning">意义：1 GB 文件用 SHA-256 大约 0.4–0.7 秒；如果只能走纯软件实现，会慢约一个数量级——大文件校验和批量校验基本就不可行了。指令路径还更省电、发热更少。</string>
+    <string name="help_hw_meaning">意义：在支持的设备上，1 GB 文件用 SHA-256 大约 0.4–0.7 秒；如果只能走纯软件实现，会慢约一个数量级——大文件校验和批量校验基本就不可行了。指令路径还更省电、发热更少。</string>
     <string name="help_hw_not_accel">哪些没有加速：SM3 走纯软件实现（明显慢于指令路径）；SHA-3 没有系统库，本应用自带 ARMv8.2 汇编（没库时自动回退纯软件——宁可慢，绝不产出错哈希）。CRC32 用的是平台原生实现（很快），它是校验和、不是加密哈希。</string>
 
     <string name="help_tasks_title">长任务与通知</string>
     <string name="help_tasks_1">大文件（≥ 64 MB 的“长任务”）会挂一条常驻通知（前台服务）：防杀、防降频，还能一键取消；小文件不会打扰你。</string>
-    <string name="help_tasks_2">计算期间默认阻止“自动熄屏”。手动锁屏后，本机 ROM 仍可能冻结计算（实测前台服务 + 唤醒锁都不豁免）——设置里的几项开关和电池白名单是缓解手段，不是根治。</string>
+    <string name="help_tasks_2">计算期间默认阻止“自动熄屏”。手动锁屏后，部分定制 ROM 仍可能冻结计算（实测连前台服务 + 唤醒锁都不豁免）——设置里的几项开关和电池白名单是缓解手段，不是根治。</string>
     <string name="help_tasks_3">完成提醒只在 App 不在前台时弹；用户自己取消不算失败，也不会弹提醒。</string>
 
     <string name="help_tradeoffs_title">本应用的几个取舍</string>
@@ -220,7 +220,7 @@
     <string name="help_tradeoff_case_body">十六进制 A–F 的大小写只是书写习惯，同一个字节的两种写法，比对时会统一处理。</string>
     <string name="help_tradeoff_parallel_title">批量并行（默认 2 路）</string>
     <string name="help_tradeoff_parallel_body">单文件的哈希链没法并行；同时算多个文件（1–8 可调）才能把总吞吐抬上去。</string>
-    <string name="help_footer">以上速度数据来自本机实测（随型号与频率档位浮动）；“硬件指令 ≫ 纯软件”的结论不变。</string>
+    <string name="help_footer">以上为参考值（来自项目测试机；随机型与频率档位浮动）。“硬件指令 ≫ 纯软件”的结论不变。</string>
 
     <!-- ============ 通知渠道 ============ -->
     <string name="notif_channel_progress_name">计算进度</string>

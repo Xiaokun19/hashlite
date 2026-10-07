@@ -150,14 +150,14 @@
     <string name="settings_keep_screen_on">Keep the screen on while computing</string>
     <string name="settings_keep_screen_on_sub">No permission needed. It only blocks auto screen-off — pressing the power button still works (see the next two items).</string>
     <string name="settings_notify_progress">Persistent notification (progress / cancel)</string>
-    <string name="settings_notify_progress_sub">Long tasks show progress and offer one-tap cancel (via a foreground service); it also lowers the chance of being frozen. On this ROM, freezing can still happen after the screen goes off — hence the next two fallbacks.</string>
+    <string name="settings_notify_progress_sub">Long tasks show progress and offer one-tap cancel (via a foreground service); it also lowers the chance of being frozen. On some custom ROMs, freezing can still happen after the screen goes off — hence the next two fallbacks.</string>
     <string name="settings_notify_perm_warning">\n⚠ Notification permission not granted: the notification will not appear in the shade (the service still runs)</string>
     <string name="settings_notify_result">Notify when done</string>
     <string name="settings_notify_result_sub">One alert on success / mismatch / failure; tap to return to the app</string>
     <string name="settings_keep_awake">Keep computing with the screen off (wake lock)</string>
-    <string name="settings_keep_awake_sub">Holds a partial wake lock for long tasks (CPU stays awake). Not guaranteed to beat this ROM’s freeze-on-screen-off behavior; a last-resort safeguard, at a small battery cost.</string>
+    <string name="settings_keep_awake_sub">Holds a partial wake lock for long tasks (CPU stays awake). Not guaranteed to beat some custom ROMs’ freeze-on-screen-off behavior; a last-resort safeguard, at a small battery cost.</string>
     <string name="settings_battery">Unrestricted battery usage</string>
-    <string name="settings_battery_on">Whitelisted: less likely to be frozen (this ROM is aggressive; not a 100% guarantee)</string>
+    <string name="settings_battery_on">Whitelisted: less likely to be frozen (some custom ROMs are aggressive; not a 100% guarantee)</string>
     <string name="settings_battery_off">Not whitelisted: it may be frozen while the screen is off / in the background (even the foreground service gets frozen in our tests) — adding the whitelist is recommended</string>
     <string name="action_go_settings">Open settings</string>
 
@@ -192,23 +192,23 @@
     <string name="help_algo_sha1_note">Also broken in practice (SHAttered, 2017) — don’t use it for new work</string>
     <string name="help_algo_sha256_note">The most common, safest choice today</string>
     <string name="help_algo_sha2_note">Different grades of the SHA-2 family; SHA-512 uses 64-bit words internally, so its structure differs</string>
-    <string name="help_algo_sha3_note">The newer standard (Keccak); this app bundles an ARMv8.2 assembly implementation, ≈0.7–1.0 GB/s (≈0.3 GB/s when falling back to software)</string>
+    <string name="help_algo_sha3_note">The newer standard (Keccak); this app bundles an ARMv8.2 assembly implementation: ≈0.7–1.0 GB/s on supported devices (≈0.3 GB/s when falling back to software)</string>
     <string name="help_algo_sm3_note">Chinese national standard with strength similar to SHA-256; software-only in this app (no instruction path)</string>
     <string name="help_algo_crc32_note">An error-detection checksum (common in .sfv lists); not a cryptographic hash — it can be forged</string>
     <string name="help_collision_body">A “collision” means two different files producing the same fingerprint. Being able to construct collisions doesn’t mean the file can be reversed — but for anti-tampering purposes it is fatal enough.</string>
 
     <string name="help_hw_title">What hardware acceleration means</string>
     <string name="help_hw_intro">Modern ARM CPUs carry dedicated hashing instructions. This app checks two things — whether the CPU has the instruction, and whether the implementation actually uses it (measured) — and only then lights the CPU badge.</string>
-    <string name="help_hw_bench_intro">Measured on this device (memory benchmark, disk excluded):</string>
+    <string name="help_hw_bench_intro">Reference figures (from the project’s test device; memory benchmark, disk excluded):</string>
     <string name="help_hw_note_native">hardware instructions</string>
     <string name="help_hw_sha3_value">≈0.7–1.0 GB/s</string>
     <string name="help_hw_sha3_note">bundled assembly (EOR3); ≈0.3 GB/s if it falls back to software</string>
-    <string name="help_hw_meaning">In practice: a 1 GB file takes roughly 0.4–0.7 s with SHA-256. A software-only implementation is about an order of magnitude slower, which would make large-file and batch verification impractical. The instruction path also draws less power and runs cooler.</string>
+    <string name="help_hw_meaning">In practice, on supported devices a 1 GB file takes roughly 0.4–0.7 s with SHA-256. A software-only implementation is about an order of magnitude slower, which would make large-file and batch verification impractical. The instruction path also draws less power and runs cooler.</string>
     <string name="help_hw_not_accel">What isn’t accelerated: SM3 runs in pure software; SHA-3 has no system library, so the app carries its own ARMv8.2 assembly and falls back to software when unavailable — slower rather than wrong. CRC32 uses the platform’s native implementation and is very fast; it is a checksum, not a cryptographic hash.</string>
 
     <string name="help_tasks_title">Long tasks and notifications</string>
     <string name="help_tasks_1">A “long task” (≥64 MB) shows a persistent notification (a foreground service): harder to kill, harder to throttle, one-tap cancel. Small files won’t bother you.</string>
-    <string name="help_tasks_2">Auto screen-off is blocked while computing by default. If you lock the screen manually, this ROM may still freeze the computation (in our tests, neither the foreground service nor the wake lock was exempt) — the switches in Settings and the battery whitelist are mitigations, not a cure.</string>
+    <string name="help_tasks_2">Auto screen-off is blocked while computing by default. If you lock the screen manually, some custom ROMs may still freeze the computation (in the project’s tests, neither the foreground service nor the wake lock was exempt) — the switches in Settings and the battery whitelist are mitigations, not a cure.</string>
     <string name="help_tasks_3">The “done” alert only fires when the app is not in the foreground; cancelling yourself is not a failure and won’t notify.</string>
 
     <string name="help_tradeoffs_title">Design choices in this app</string>
@@ -220,7 +220,7 @@
     <string name="help_tradeoff_case_body">Uppercase or lowercase hex is just a writing convention; the two spellings of a byte are treated the same when comparing.</string>
     <string name="help_tradeoff_parallel_title">Batch parallelism (2 by default)</string>
     <string name="help_tradeoff_parallel_body">A single file’s hash chain can’t be parallelized; hashing several files at once (1–8) is what lifts total throughput.</string>
-    <string name="help_footer">Speed numbers are measured on this device and vary with model and frequency tier; the conclusion “hardware ≫ software” holds regardless.</string>
+    <string name="help_footer">The figures above are reference values (from the project’s test device; they vary by model and frequency tier). The conclusion “hardware ≫ software” holds regardless.</string>
 
     <!-- ============ Notification channels ============ -->
     <string name="notif_channel_progress_name">Progress</string>
