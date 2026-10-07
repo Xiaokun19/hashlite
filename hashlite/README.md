@@ -1,6 +1,7 @@
 # 哈希计算（HashLite）
 
 纯净版文件哈希工具：只保留最常见的算法，界面为主，不带基准/自检/温控仪表。
+（早期还有一个用于性能研究的“诊断版”（基准、温度、瓶颈分析），未包含在本仓库中——这里只有纯净版这一个模块。）
 
 - 包名 `io.github.xiaokun19.hashlite`　minSdk 24 / compileSdk 35 / targetSdk 35
 - UI：Jetpack Compose + Material 3，自定义冷色主题（不跟随动态取色）

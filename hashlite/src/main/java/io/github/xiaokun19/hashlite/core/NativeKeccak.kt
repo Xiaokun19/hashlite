@@ -9,6 +9,7 @@ import java.nio.ByteBuffer
  * 1. [loaded]：`.so` 没打进 APK / 非 arm64 设备 → 加载失败 → 一律回退 BC；
  * 2. [usable]：**向量自检通过**才算可用（惰性、只做一次）。自检不过就回退——
  *    宁可慢，也绝不产出错哈希。首次通过时会顺手用 4 MiB 实测选变体
+ *    （plain vs cext/EOR3；上游作者注释里存在“扩展指令反而更慢”的核，所以必须实测选择）。
  *
  * JVM 单测环境里 `loadLibrary` 直接抛异常 → usable=false → 走 BC，测试不受影响。
  */
@@ -39,7 +40,8 @@ object NativeKeccak {
      *
      * 为什么不放在 [usable] 里：小文件不该为校正买单（16 MiB × 两变体 ≈ 0.2 s，
      * 对 1 MB 的文件就是灾难）；而大文件正好把它摊薄。
-     * 为什么不只用 HWCAP：作者注释里存在"扩展指令反而更慢"的核（Cortex-X2 11.3 vs 6.1 c/B），
+     * 为什么不只用 HWCAP：上游作者注释里存在"扩展指令反而更慢"的核（Cortex-X2 11.3 vs 6.1 c/B），
+     * 所以必须实测，且只在实测占优时才切。
      */
     fun calibrateIfNeeded(chunkBytes: Int) {
         if (calibrated || chunkBytes < 8 * 1024 * 1024) return

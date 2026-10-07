@@ -8,7 +8,8 @@
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
-    <!-- 申请"不受电池优化限制"：本机 ROM 在灭屏后会冻结后台 App（实测连前台服务都冻），
+    <!-- 申请"不受电池优化限制"：部分 ROM 在灭屏后会冻结后台 App（实测连前台服务也会被冻）；
+         电池白名单是 App 侧最标准的缓解手段。 -->
     <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
 
     <!-- 部分唤醒锁：长任务期间保持 CPU 不休眠（也是"别把我冻了"的信号）。

@@ -142,6 +142,7 @@ object NativeSelfCheck {
      * 持续负载实验：在 [seconds] 秒内反复哈希同一块数据，逐轮报速度。
      *
      * 用途：验证**前台服务能不能扛住系统的压频**——没有前台服务时，App 不交互 1~3 秒后
+     * 大核会被降档，SHA3 从 ~1000 MB/s 掉到 ~245 MB/s（实测数据）。
      * 打印前 8 轮 + 每 10 轮 +最后的汇总，方便直接看出"什么时候开始掉"。
      */
     fun sustain(seconds: Int, sizeMiB: Int = 64, onProgress: ((percent: Int, text: String) -> Unit)? = null): String {
