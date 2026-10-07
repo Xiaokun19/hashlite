@@ -31,9 +31,13 @@ Android 文件哈希计算 / 校验工具，本仓库**只有一个模块**：
   维护者 CI 产物使用共享 debug key（仅存于 Actions Secret）。正式版（Release）将使用独立的
   release key（同样只存于 Secrets）——**debug 版与正式版签名不同、互不覆盖**。
 
+安装到设备（`adb`）：
 
 ```bash
-# shell 侧
+adb install -r hashlite/build/outputs/apk/debug/hashlite-debug.apk
+# 个别设备可能需要先从 /data/local/tmp 中转：
+# adb push hashlite/build/outputs/apk/debug/hashlite-debug.apk /data/local/tmp/ \
+#   && adb shell pm install -r /data/local/tmp/hashlite-debug.apk
 ```
 
 ## 无头入口（不用点屏幕，报告写到 App 外部目录，shell 可读）

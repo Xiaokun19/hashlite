@@ -28,7 +28,10 @@
 ## 重新生成
 
 ```bash
+# 取 OpenSSL 3.0.13 源码（约 15 MB）：
 curl -sSL -o ossl.tar.gz \
+  'https://github.com/openssl/openssl/archive/refs/tags/openssl-3.0.13.tar.gz'
+# （直连不畅时可换任意可达的 GitHub 镜像 / 代理域名）
 tar xzf ossl.tar.gz && cd openssl-openssl-3.0.13
 # 生成 .inst 形式（不依赖汇编器认识 armv8.2-a+sha3，最可移植）
 perl crypto/sha/asm/keccak1600-armv8.pl linux64 /tmp/keccak1600-armv8.S

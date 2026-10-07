@@ -244,7 +244,9 @@ python3 build_icon.py        # 需要 rsvg-convert 与 Pillow
 
 ```bash
 ./gradlew :hashlite:test :hashlite:assembleDebug     # 48 个单测 + APK
-# shell 侧：
+# 安装到设备：
+adb install -r hashlite/build/outputs/apk/debug/hashlite-debug.apk
+# （个别设备可能需要先从 /data/local/tmp 中转：adb push … && adb shell pm install -r …）
 # 直接喂文件给它算（自动开算）：
 am start -a android.intent.action.VIEW -d content://media/external/file/<id> -t '*/*' -f 1 -n io.github.xiaokun19.hashlite/.MainActivity
 # 无头硬件检测（读报告，不用点屏幕）：
