@@ -27,6 +27,24 @@ android {
     //  - CI：构建前从 Actions Secret（DEBUG_KEYSTORE_B64）恢复同一把 key；
     //  - 找不到文件时自动回退为 AGP 默认 debug 签名（fork / 无 secret 也能正常构建，只是签名不同）。
     val hasSharedKeystore = file("debug.keystore").exists()
+
+    // 正式版签名：release.keystore 同样不进仓库（*.keystore / *.jks 均被 .gitignore 挡）。
+    //  - 本机：把 release.keystore 放 hashlite/（可用 HASHLITE_RELEASE_KEYSTORE 指定别的路径），
+    //    并导出 HASHLITE_RELEASE_STORE_PASSWORD / HASHLITE_RELEASE_KEY_ALIAS / HASHLITE_RELEASE_KEY_PASSWORD；
+    //  - CI（release.yml）：从 Actions Secrets 恢复 keystore + 注入同样三个环境变量；
+    //  - 任一条件缺失 → release 构建不加签名（产出 unsigned 包；fork / 无 secret 也能编过，
+    //    正式发布 workflow 会显式检查并卡住）。
+    val releaseStorePassword: String? = System.getenv("HASHLITE_RELEASE_STORE_PASSWORD")
+    val releaseKeyAlias: String? = System.getenv("HASHLITE_RELEASE_KEY_ALIAS")
+    val releaseKeyPassword: String? = System.getenv("HASHLITE_RELEASE_KEY_PASSWORD")
+    val releaseKeystorePath = System.getenv("HASHLITE_RELEASE_KEYSTORE").takeUnless { it.isNullOrBlank() }
+        ?: "release.keystore"
+    val releaseKeystore = file(releaseKeystorePath)
+    val canSignRelease = releaseKeystore.exists() &&
+        !releaseStorePassword.isNullOrBlank() &&
+        !releaseKeyAlias.isNullOrBlank() &&
+        !releaseKeyPassword.isNullOrBlank()
+
     signingConfigs {
         if (hasSharedKeystore) {
             create("sharedDebug") {
@@ -34,6 +52,14 @@ android {
                 storePassword = "android"
                 keyAlias = "hashdebug"
                 keyPassword = "android"
+            }
+        }
+        if (canSignRelease) {
+            create("release") {
+                storeFile = releaseKeystore
+                storePassword = releaseStorePassword
+                keyAlias = releaseKeyAlias
+                keyPassword = releaseKeyPassword
             }
         }
     }
@@ -45,6 +71,9 @@ android {
             }
         }
         release {
+            if (canSignRelease) {
+                signingConfig = signingConfigs.getByName("release")
+            }
             isMinifyEnabled = false
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
