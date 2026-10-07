@@ -2,6 +2,8 @@
 
 [![CI](https://github.com/Xiaokun19/hashlite/actions/workflows/ci.yml/badge.svg)](https://github.com/Xiaokun19/hashlite/actions/workflows/ci.yml)
 
+[**下载最新版本（Releases）**](https://github.com/Xiaokun19/hashlite/releases/latest)
+
 轻量、干净的 Android 文件哈希计算 / 校验应用：10 个算法（含 SHA-3、SM3、CRC32）、
 批量校验与多文件并行哈希。**不申请存储权限、不联网**，所有计算在本地完成，支持 Android 7.0+。
 
@@ -36,9 +38,11 @@
 
 ## 安装
 
-目前尚未提供正式发布版，可自行构建（见下）。
-仓库的 CI 会为每次提交构建 Debug APK，可从 GitHub Actions 的当次运行下载 Artifacts。
-Debug 版使用公开的共享调试签名，可与本机构建互相覆盖安装；正式版将使用独立签名。
+从 [**Releases 页面**](https://github.com/Xiaokun19/hashlite/releases/latest) 下载最新版：
+
+- 文件名形如 `hashlite-x.y.z-arm64-v8a.apk`，仅支持 64 位 ARM 设备（Android 7.0+）
+- 正式版使用独立签名；若安装过此前的 Debug 版，需先卸载再安装（应用只保存少量设置，影响很小）
+- 也可自行构建（见下）；CI 会为每次提交构建 Debug APK，可从 GitHub Actions 运行记录下载 Artifacts
 
 ## 构建
 
@@ -55,6 +59,7 @@ Debug 版使用公开的共享调试签名，可与本机构建互相覆盖安�
 | `hashlite/` | 应用模块（本项目唯一模块） |
 | `hashlite/README.md` | 设计文档：算法、加速检测、流式引擎、批量并行、实测数据 |
 | `.github/workflows/ci.yml` | CI：单元测试 + 构建（含 native） |
+| `.github/workflows/release.yml` | 发布：推送 `v*` 标签 → 构建签名 APK → Draft Release |
 | `tools/aapt2/` | ARM64 开发环境用 aapt2 |
 | `LICENSES/` · `THIRD_PARTY_NOTICES.md` | 第三方许可声明 |
 
@@ -62,7 +67,6 @@ Debug 版使用公开的共享调试签名，可与本机构建互相覆盖安�
 
 - 部分定制 ROM 在手动锁屏后会冻结后台计算；前台服务 / 唤醒锁 / 电池白名单只能缓解
 - SM3 为纯软件实现（未做指令加速）
-- 目前仅提供 Debug 构建；正式签名发布尚未提供
 
 ## 致谢与开发说明
 
