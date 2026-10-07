@@ -28,6 +28,7 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = "My Application"
+rootProject.name = "hashlite"
 // 只保留纯净版（界面为主、常用算法）。
+// 原来的诊断版 :app（实验分支：基准/温控/自检）已于 2026-10-05 归档剔除；本仓库只有纯净版这一个模块。
 include(":hashlite")
