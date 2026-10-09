@@ -94,6 +94,23 @@ android {
         }
     }
 
+    // Lint：兼容性硬门槛（NewApi 等）保持 error 并让失败阻断构建（默认即此，显式写出防漂移）。
+    // 以下检查与项目的既定决策不匹配，明确关闭；其余检查（含全部兼容性类）保持启用。
+    lint {
+        abortOnError = true
+        disable += setOf(
+            // 依赖按"最少 + 钉版"维护，升级与否人工评估：
+            "GradleDependency",
+            "NewerVersionAvailable",
+            // 只发布 arm64 APK，不提供 x86 / ChromeOS 变体：
+            "ChromeOsAbiSupport",
+            // targetSdk 35 为有意选择（跟随最新稳定平台适配节奏）：
+            "OldTargetApi",
+            // APK 分发（非 AAB）：语言跟随应用内设置，不涉及 Play 语言拆分：
+            "AppBundleLocaleChanges",
+        )
+    }
+
     // ---------------------------------------------------------------- native（可选件）
     // libkeccak.so 的汇编是 aarch64 专属，而 NDK 的**宿主工具链只有 x86_64**——
     // 本机（ARM64 proot）根本执行不了 NDK 编译器，所以本地默认不编 native

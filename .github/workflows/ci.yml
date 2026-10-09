@@ -57,6 +57,10 @@ jobs:
       - name: Unit tests
         run: ./gradlew :hashlite:test --console=plain
 
+      # 兼容性硬门槛：NewApi 等作 error 处理（配置见 hashlite/build.gradle.kts 的 lint 块）
+      - name: Android Lint
+        run: ./gradlew :hashlite:lintDebug --console=plain
+
       # native 在本地（ARM64）编不了（NDK 宿主工具链只有 x86_64），所以这里显式开启：
       # -Phashlite.native=true 会启用 externalNativeBuild + abiFilters arm64-v8a
       - name: Assemble debug APK (with native keccak)
