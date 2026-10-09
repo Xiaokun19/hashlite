@@ -1,4 +1,4 @@
-# HashLite（哈希计算）
+# <img src="docs/icon.png" width="40" height="40" alt="icon" align="center"> HashLite（哈希计算）
 
 [![CI](https://github.com/Xiaokun19/hashlite/actions/workflows/ci.yml/badge.svg)](https://github.com/Xiaokun19/hashlite/actions/workflows/ci.yml)
 
@@ -26,15 +26,25 @@
 |---|---|---|
 | ![单文件](docs/screenshots/main.png) | ![批量校验](docs/screenshots/batch.png) | ![深色模式](docs/screenshots/dark.png) |
 
-## 性能参考
+## 性能：硬件加速 vs 纯软件
 
-内存基准，数据来自项目测试机（不同机型数值会浮动）：
+同一台设备、同一份数据，走 CPU 硬件指令和走纯软件实现（BouncyCastle / Java）的差距——这就是本应用坚持"两层判定"的理由（内存基准，来自项目测试机；不同机型数值会浮动）：
 
-- 单文件 SHA-256：约 1.5–2.7 GB/s（硬件指令）
+| 算法 | 硬件加速 | 纯软件实现 | 差距 |
+|---|---|---|---|
+| SHA-1 | ≈1.6–2.2 GB/s（平台硬件指令） | ≈0.16–0.19 GB/s | **约 10×** |
+| SHA-256 | ≈1.5–2.7 GB/s（平台硬件指令） | ≈0.15–0.19 GB/s | **约 9–13×** |
+| SHA-512 | ≈1.0–1.7 GB/s（平台硬件指令） | ≈0.09–0.18 GB/s | **约 7–13×** |
+| SHA3-256 | ≈0.7–1.0 GB/s（内置 ARMv8.2 汇编） | ≈0.3 GB/s（BouncyCastle） | **约 2.3–2.8×** |
+| CRC32 | 平台原生（zlib） | Java 查表实现 | **约 17–34×** |
+
+实际意义：1 GB 的文件用 SHA-256 只要 **约 0.4–0.7 秒**；若只能走纯软件实现要 **约 5–7 秒**——大文件与批量校验能不能"日常可用"，差的就是这一点。
+
+其它参考：
+
 - 多文件并行：8 路聚合约 7.35 GB/s（16 × 64 MiB，页缓存命中）
-- SHA3-256：内置汇编约 0.7–1.0 GB/s；纯软件回退约 0.3 GB/s
-
-测量条件与完整数据见设计文档 → [`hashlite/README.md`](hashlite/README.md)
+- 硬件加速的判定：**CPU 指令检测 + 微基准实测，两层都通过才点亮徽标**（"有指令 ≠ 用上指令"）
+- 测量条件与完整数据见设计文档 → [`hashlite/README.md`](hashlite/README.md)
 
 ## 安装
 
@@ -47,7 +57,7 @@
 ## 构建
 
 - 要求：JDK 17；Android SDK（platforms;android-35）
-- `./gradlew :hashlite:test :hashlite:assembleDebug`（48 个单元测试 + APK）
+- `./gradlew :hashlite:test :hashlite:assembleDebug`（56 个单元测试 + APK）
 - native（SHA-3 汇编）默认不在本地编译，由 CI 以 `-Phashlite.native=true` 构建；
   本地构建自动回退纯软件实现，功能不受影响
 - 在 ARM64 开发机上构建需先运行 `./setup_android_env.sh`（准备本机 aapt2）
