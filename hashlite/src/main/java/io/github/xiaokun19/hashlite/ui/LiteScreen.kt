@@ -15,6 +15,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -158,6 +159,9 @@ class LiteUiState {
         const val KEY_UPPERCASE = "uppercase"
     }
 }
+
+/**宽屏阈值：宽度 ≥600dp（手机横屏/平板）时启用左右双栏，其余保持单栏。 */
+private val TwoPaneMinWidth =600.dp
 
 @Composable
 fun LiteScreen(
@@ -432,88 +436,138 @@ fun LiteScreen(
 
     Surface(modifier = Modifier.fillMaxSize(), color = colors.background) {
         Box(modifier = Modifier.fillMaxSize()) {
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .safeDrawingPadding()
-                .verticalScroll(rememberScrollState())
-                .padding(start = 20.dp, end = 20.dp, top = 12.dp, bottom = 28.dp),
-            verticalArrangement = Arrangement.spacedBy(18.dp),
-        ) {
-            Header(
-                flags = cpuFlags,
-                ratios = state.accelRatios,
-                onHelp = { state.showHelp = true },
-                onSettings = { state.showSettings = true },
-            )
+            BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
+                // 宽屏（≥600dp：手机横屏/平板）分双栏：左=操作流，右=结果流；其余保持单栏
+                val wide = maxWidth >= TwoPaneMinWidth
+                val outerScroll = rememberScrollState()
 
-            // 有未查看的诊断日志（崩溃 / 错误报告）时提示一次；查看或忽略后消失
-            diagUnseen?.let { entry ->
-                DiagnosticsCard(
-                    entry = entry,
-                    onView = { openDiagSheet(entry) },
-                    onShare = { shareDiag(entry) },
-                    onIgnore = {
-                        Diagnostics.markSeen(context, entry)
-                        refreshDiag()
-                    },
-                )
-            }
+                // 单文件页两个内容组：窄屏按序纵排；宽屏拆到左右两栏
+                val opsGroup: @Composable () -> Unit = {
+                    FileCard(
+                        state = state,
+                        onPick = { picker.launch(arrayOf("*/*")) },
+                        onClear = { state.clear() },
+                    )
 
-            ModeSwitcher(mode = mode, onSelect = { mode = it })
+                    AlgorithmPicker(state, accelerated)
 
-            if (mode == HashMode.BATCH) {
-                BatchSection(state = batchState)
-            } else {
-                FileCard(
-                    state = state,
-                    onPick = { picker.launch(arrayOf("*/*")) },
-                    onClear = { state.clear() },
-                )
+                    ActionArea(state = state, onStart = { start() }, onCancel = { engine?.cancel() })
 
-                AlgorithmPicker(state, accelerated)
-
-                ActionArea(state = state, onStart = { start() }, onCancel = { engine?.cancel() })
-
-                state.outcome?.let { outcome ->
-                    if (outcome.hexByAlgorithm.isNotEmpty()) {
-                        ResultCard(
-                            outcome = outcome,
-                            copied = state.copied,
-                            uppercase = state.uppercase,
-                            accelerated = accelerated,
-                            onToggleUppercase = { state.setUppercase(context, !state.uppercase) },
-                            onCopy = { label, text -> copyToClipboard(label, text) },
+                    state.error?.let { message ->
+                        Text(
+                            stringResource(R.string.error_with_message, message),
+                            fontSize = 12.sp,
+                            color = colors.error,
+                        )
+                    }
+                    if (state.outcome?.cancelled == true) {
+                        // 用户主动取消：中性色、不算“错误”
+                        Text(
+                            stringResource(R.string.state_cancelled),
+                            fontSize = 12.sp,
+                            color = colors.onSurfaceVariant,
                         )
                     }
                 }
 
-                CompareCard(state = state)
+                val resultsGroup: @Composable () -> Unit = {
+                    state.outcome?.let { outcome ->
+                        if (outcome.hexByAlgorithm.isNotEmpty()) {
+                            ResultCard(
+                                outcome = outcome,
+                                copied = state.copied,
+                                uppercase = state.uppercase,
+                                accelerated = accelerated,
+                                onToggleUppercase = { state.setUppercase(context, !state.uppercase) },
+                                onCopy = { label, text -> copyToClipboard(label, text) },
+                            )
+                        }
+                    }
 
-                state.error?.let { message ->
+                    CompareCard(state = state)
+
+                    Spacer(Modifier.height(4.dp))
                     Text(
-                        stringResource(R.string.error_with_message, message),
-                        fontSize = 12.sp,
-                        color = colors.error,
-                    )
-                }
-                if (state.outcome?.cancelled == true) {
-                    // 用户主动取消：中性色、不算“错误”
-                    Text(
-                        stringResource(R.string.state_cancelled),
-                        fontSize = 12.sp,
+                        stringResource(R.string.footer_readonly_note),
+                        fontSize = 11.sp,
                         color = colors.onSurfaceVariant,
                     )
                 }
 
-                Spacer(Modifier.height(4.dp))
-                Text(
-                    stringResource(R.string.footer_readonly_note),
-                    fontSize = 11.sp,
-                    color = colors.onSurfaceVariant,
-                )
+                Column(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .safeDrawingPadding()
+                        // 宽屏时整页不滚动，改由左右两栏各自滚动
+                        .then(if (wide) Modifier else Modifier.verticalScroll(outerScroll))
+                        .padding(start = 20.dp, end = 20.dp, top = 12.dp, bottom = 28.dp),
+                    verticalArrangement = Arrangement.spacedBy(18.dp),
+                ) {
+                    Header(
+                        flags = cpuFlags,
+                        ratios = state.accelRatios,
+                        onHelp = { state.showHelp = true },
+                        onSettings = { state.showSettings = true },
+                    )
+
+                    // 有未查看的诊断日志（崩溃/错误报告）时提示一次；查看或忽略后消失
+                    diagUnseen?.let { entry ->
+                        DiagnosticsCard(
+                            entry = entry,
+                            onView = { openDiagSheet(entry) },
+                            onShare = { shareDiag(entry) },
+                            onIgnore = {
+                                Diagnostics.markSeen(context, entry)
+                                refreshDiag()
+                            },
+                        )
+                    }
+
+                    ModeSwitcher(mode = mode, onSelect = { mode = it })
+
+                    if (mode == HashMode.BATCH) {
+                        if (wide) {
+                            BatchSection(
+                                state = batchState,
+                                wide = true,
+                                modifier = Modifier.weight(1f),
+                            )
+                        } else {
+                            BatchSection(state = batchState)
+                        }
+                    } else if (wide) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .weight(1f),
+                            horizontalArrangement = Arrangement.spacedBy(18.dp),
+                        ) {
+                            // 左栏：操作流（文件 → 算法 → 开始）
+                            Column(
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .verticalScroll(rememberScrollState()),
+                                verticalArrangement = Arrangement.spacedBy(18.dp),
+                            ) {
+                                opsGroup()
+                            }
+
+                            // 右栏：结果流（结果 → 校验）
+                            Column(
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .verticalScroll(rememberScrollState()),
+                                verticalArrangement = Arrangement.spacedBy(18.dp),
+                            ) {
+                                resultsGroup()
+                            }
+                        }
+                    } else {
+                        opsGroup()
+                        resultsGroup()
+                    }
+                }
             }
-        }
 
             // 帮助面板：遮罩 + 自底升起的说明页
             if (state.showHelp) {

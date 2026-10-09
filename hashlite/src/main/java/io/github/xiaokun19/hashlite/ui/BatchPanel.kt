@@ -17,8 +17,10 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -185,8 +187,9 @@ class BatchUiState {
     }
 }
 
+/**批量校验区块：窄屏单列滚动；宽屏（≥600dp）双栏——左=操作，右=结果。 */
 @Composable
-fun BatchSection(state: BatchUiState) {
+fun BatchSection(state: BatchUiState, wide: Boolean = false, modifier: Modifier = Modifier) {
     val context = LocalContext.current
     val clipboard = LocalClipboardManager.current
     val scope = rememberCoroutineScope()
@@ -333,7 +336,8 @@ fun BatchSection(state: BatchUiState) {
         }
     }
 
-    Column(verticalArrangement = Arrangement.spacedBy(18.dp)) {
+    // 两组内容：窄屏按序纵排；宽屏拆到左右两栏（左=目录/清单/并行度/开始，右=判定结果/导出）
+    val controls: @Composable () -> Unit = {
         FolderCard(state, running = state.running, onPick = { treePicker.launch(null) }, onClear = { state.clearFolder() })
 
         ChecksumCard(
@@ -346,20 +350,6 @@ fun BatchSection(state: BatchUiState) {
         ParallelCard(state)
 
         BatchAction(state, onStart = { start() }, onCancel = { engine?.cancel() })
-
-        state.report?.let { report ->
-            BatchResultCard(
-                state = state,
-                report = report,
-                onCopy = { label, text -> copyToClipboard(label, text) },
-            )
-            ExportCard(
-                state = state,
-                report = report,
-                onExport = { exportPicker.launch(state.suggestedExportName()) },
-                onCopy = { copyToClipboard("TEXT", it) },
-            )
-        }
 
         if (state.report?.cancelled == true) {
             // 用户主动取消：中性色、不算“错误”
@@ -377,12 +367,58 @@ fun BatchSection(state: BatchUiState) {
                 )
             }
         }
+    }
+
+    val outputs: @Composable () -> Unit = {
+        state.report?.let { report ->
+            BatchResultCard(
+                state = state,
+                report = report,
+                onCopy = { label, text -> copyToClipboard(label, text) },
+            )
+            ExportCard(
+                state = state,
+                report = report,
+                onExport = { exportPicker.launch(state.suggestedExportName()) },
+                onCopy = { copyToClipboard("TEXT", it) },
+            )
+        }
 
         Text(
             stringResource(R.string.batch_footer_note),
             fontSize = 11.sp,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
+    }
+
+    if (wide) {
+        Row(
+            modifier = modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(18.dp),
+        ) {
+            Column(
+                modifier = Modifier
+                    .weight(1f)
+                    .verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(18.dp),
+            ) {
+                controls()
+            }
+
+            Column(
+                modifier = Modifier
+                    .weight(1f)
+                    .verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(18.dp),
+            ) {
+                outputs()
+            }
+        }
+    } else {
+        Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(18.dp)) {
+            controls()
+            outputs()
+        }
     }
 }
 
