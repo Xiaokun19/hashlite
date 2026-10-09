@@ -38,7 +38,8 @@ int kc_variant_default(void) {
 }
 
 void kc_set_variant(int cext) {
-    g_variant = cext ? 1 : 0;
+    /* 双保险：没有 SHA3 扩展的机器上永远不允许切到 cext（调用方亦有门控） */
+    g_variant = (cext && kc_have_sha3ext()) ? 1 : 0;
 }
 
 const char *kc_variant_name(void) {
@@ -139,18 +140,25 @@ int kc_self_test(void) {
     static const char *MSG1M = NULL; /* 1e6 x 'a' 另算 */
     unsigned char out[64];
     int fails = 0;
+    /*没有 SHA3 扩展的机器上禁止触碰 cext（EOR3 指令会 SIGILL），
+     * 自检只覆盖 plain——usable 的判定不应依赖老旧 CPU 跑不了的东西。 */
+    int has_sha3 = kc_have_sha3ext();
 
     /* 空串 */
     one_shot("", 0, out, 32, KC_RATE_SHA3_256, KC_DOMAIN_SHA3, 0);
     if (!hex_eq(out, 32, "a7ffc6f8bf1ed76651c14756a061d662f580ff4de43b49fa82d80a4b80f8434a")) fails++;
-    one_shot("", 0, out, 32, KC_RATE_SHA3_256, KC_DOMAIN_SHA3, 1);
-    if (!hex_eq(out, 32, "a7ffc6f8bf1ed76651c14756a061d662f580ff4de43b49fa82d80a4b80f8434a")) fails++;
+    if (has_sha3) {
+        one_shot("", 0, out, 32, KC_RATE_SHA3_256, KC_DOMAIN_SHA3, 1);
+        if (!hex_eq(out, 32, "a7ffc6f8bf1ed76651c14756a061d662f580ff4de43b49fa82d80a4b80f8434a")) fails++;
+    }
 
     /* "abc" */
     one_shot(ABC, 3, out, 32, KC_RATE_SHA3_256, KC_DOMAIN_SHA3, 0);
     if (!hex_eq(out, 32, "3a985da74fe225b2045c172d6bd390bd855f086e3e9d525b46bfe24511431532")) fails++;
-    one_shot(ABC, 3, out, 32, KC_RATE_SHA3_256, KC_DOMAIN_SHA3, 1);
-    if (!hex_eq(out, 32, "3a985da74fe225b2045c172d6bd390bd855f086e3e9d525b46bfe24511431532")) fails++;
+    if (has_sha3) {
+        one_shot(ABC, 3, out, 32, KC_RATE_SHA3_256, KC_DOMAIN_SHA3, 1);
+        if (!hex_eq(out, 32, "3a985da74fe225b2045c172d6bd390bd855f086e3e9d525b46bfe24511431532")) fails++;
+    }
     one_shot(ABC, 3, out, 64, KC_RATE_SHA3_512, KC_DOMAIN_SHA3, 0);
     if (!hex_eq(out, 64, "b751850b1a57168a5693cd924b6b096e08f621827444f70d884f5d0240d2712e"
                          "10e116e9192af3c91a7ec57647e3934057340b4cf408d5a56592f8274eec53f0")) fails++;
@@ -165,8 +173,10 @@ int kc_self_test(void) {
         memset(big, 'a', 1000000);
         one_shot(big, 1000000, out, 32, KC_RATE_SHA3_256, KC_DOMAIN_SHA3, 0);
         if (!hex_eq(out, 32, "5c8875ae474a3634ba4fd55ec85bffd661f32aca75c6d699d0cdcb6c115891c1")) fails++;
-        one_shot(big, 1000000, out, 32, KC_RATE_SHA3_256, KC_DOMAIN_SHA3, 1);
-        if (!hex_eq(out, 32, "5c8875ae474a3634ba4fd55ec85bffd661f32aca75c6d699d0cdcb6c115891c1")) fails++;
+        if (has_sha3) {
+            one_shot(big, 1000000, out, 32, KC_RATE_SHA3_256, KC_DOMAIN_SHA3, 1);
+            if (!hex_eq(out, 32, "5c8875ae474a3634ba4fd55ec85bffd661f32aca75c6d699d0cdcb6c115891c1")) fails++;
+        }
         free(big);
     } else {
         fails++;
@@ -223,7 +233,8 @@ void kc_bench(double *plain_mbps, double *cext_mbps, size_t bytes) {
     }
     int iters = 8;
     if (plain_mbps) *plain_mbps = bench_one(buf, bytes, KC_RATE_SHA3_256, 0, iters);
-    if (cext_mbps) *cext_mbps = bench_one(buf, bytes, KC_RATE_SHA3_256, 1, iters);
+    /* cext 只在真的支持 SHA3 扩展时才测：否则执行 EOR3 会 SIGILL（返回 0 = 跳过） */
+    if (cext_mbps) *cext_mbps = kc_have_sha3ext() ? bench_one(buf, bytes, KC_RATE_SHA3_256, 1, iters) : 0;
     free(buf);
 }
 

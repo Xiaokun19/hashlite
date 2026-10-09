@@ -11,6 +11,7 @@
 | `keccak_native.c/.h` | 薄封装：流式 API、HWCAP 探测、变体选择、自检、测速。**桌面 Linux 与 Android 共用**（本地 gcc 就能验证） |
 | `jni_keccak.c` | JNI 胶水，对应 Kotlin 侧 `core/NativeKeccak.kt` |
 | `test_linux.c` | 本地验证程序（gcc 直接编，不需要 NDK）：向量自检 + 与系统 OpenSSL 对拍 + 测速 |
+| `test_nosha3.c` | 模拟"无 SHA3 扩展"的老芯片（`--wrap=getauxval`），回归验证 cext(EOR3) 被严格门控、绝不执行 |
 | `CMakeLists.txt` | 只针对 arm64-v8a |
 
 ## 许可证
@@ -44,6 +45,26 @@ cd hashlite/src/main/cpp
 gcc -O2 -o /tmp/test_linux test_linux.c keccak_native.c keccak1600-armv8.S -lcrypto
 /tmp/test_linux          # 自检 + 与 OpenSSL 对拍 + plain/cext 测速
 ```
+
+模拟"没有 SHA3 扩展"的老芯片（回归验证 cext 门控）：
+
+```bash
+gcc -O2 -o /tmp/test_nosha3 test_nosha3.c keccak_native.c keccak1600-armv8.S \
+    -Wl,--wrap=getauxval -lcrypto
+/tmp/test_nosha3   # 期望：全过、cext = 0 MB/s（绝不执行 EOR3）
+```
+
+（可选·更接近真机）用 qemu 租一颗无 SHA3 的 CPU：`apt install qemu-user` 后
+`qemu-aarch64 -cpu cortex-a72 <测试程序>`。
+
+## 指令门控（兼容性）
+
+EOR3/RAX1/XAR/BCAX（ARMv8.2-SHA3 扩展）只在 **HWCAP sha3 = 1** 的 CPU 上允许执行——
+没有该扩展的老芯片（Armv8.0 系，A72/A73 内核的机型）执行这些指令会 **SIGILL**。因此：
+
+- 自检、测速里的 cext 路径，以及 `kc_set_variant(1)` 一律由 `kc_have_sha3ext()` 门控；
+- 正常哈希默认 plain，只有实测快 > 3% 且 HWCAP 通过才切 cext；
+- `test_nosha3.c` 是这份约束的回归测试（2026-10-10 加，此前自检/测速未门控，老芯片会闪退）。
 
 ## 为什么本地默认不编译
 
