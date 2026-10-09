@@ -97,7 +97,7 @@ jobs:
           ## 安装说明
 
           - 附件：hashlite-${VERSION}-arm64-v8a.apk，仅支持 64 位 ARM 设备（arm64-v8a，Android 7.0+）。
-          - 本包为正式签名（release key），与仓库此前 CI Artifacts / debug 版签名不同 —— 已装过旧版需先卸载再安装（应用只保存少量设置，影响很小）。
+          - 本包为正式签名（release key）：正式版之间签名保持一致，可直接覆盖升级；若安装过 CI Artifacts / debug 版，则需先卸载再安装（应用只保存少量设置，影响很小）。
           - APK SHA-256：${SHA}
 
           ## 已知限制
