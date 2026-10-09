@@ -150,11 +150,24 @@ class HashService : Service() {
         /**
          * 停止常驻通知。
          *
-         * 注意：**只调 `stopService` 是不够的**——实测过"服务已经没了、通知还挂在抽屉里"
-         * （本机 ROM 清 ServiceRecord 时不撤前台通知）。所以这里再显式 cancel 一次。
+         * 注意两点：
+         * 1. **只调 `stopService` 是不够的**——实测过"服务已经没了、通知还挂在抽屉里"
+         *    （本机 ROM 清 ServiceRecord 时不撤前台通知）。所以这里再显式 cancel 一次。
+         * 2. **优先发 `ACTION_STOP` 服务消息（startService），而不是直接 `stopService`**：
+         *    若服务刚被拉起、还没完成"转前台"，`stopService` 会把它提前撤掉，系统判定
+         *    `startForegroundService()` 的 5 秒义务落空 → `ForegroundServiceDidNotStartInTimeException`
+         *    （Android 12+ 系统级崩溃，见 2026-10-09 的诊断报告：读不了的文件点"开始"时触发）。
+         *    走服务消息则"转前台 → 停止"按序执行、义务自然满足；后台受限
+         *    （background start restrictions）时 `startService` 会失败，回退 `stopService`——
+         *    那种场景服务早已完成过前台化，直接停是安全的。
          */
         fun stop(context: Context) {
-            runCatching { context.stopService(Intent(context, HashService::class.java)) }
+            val viaMessage = runCatching {
+                context.startService(Intent(context, HashService::class.java).setAction(ACTION_STOP)) != null
+            }.getOrDefault(false)
+            if (!viaMessage) {
+                runCatching { context.stopService(Intent(context, HashService::class.java)) }
+            }
             runCatching { NotificationManagerCompat.from(context).cancel(NOTIF_ONGOING) }
         }
 
