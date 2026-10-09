@@ -58,6 +58,7 @@ import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
@@ -172,6 +173,7 @@ fun LiteScreen(
     state: LiteUiState = remember { LiteUiState() },
 ) {
     val context = LocalContext.current
+    val res = LocalResources.current
     val clipboard = LocalClipboardManager.current
     val scope = rememberCoroutineScope()
     var engine by remember { mutableStateOf<LiteHasher?>(null) }
@@ -289,12 +291,12 @@ fun LiteScreen(
             type = "text/plain"
             putExtra(
                 Intent.EXTRA_SUBJECT,
-                context.getString(R.string.diag_share_subject, Diagnostics.displayTime(entry.timeMillis)),
+                res.getString(R.string.diag_share_subject, Diagnostics.displayTime(entry.timeMillis)),
             )
             putExtra(Intent.EXTRA_TEXT, Diagnostics.read(context, entry))
         }
         runCatching {
-            context.startActivity(Intent.createChooser(intent, context.getString(R.string.diag_share_chooser)))
+            context.startActivity(Intent.createChooser(intent, res.getString(R.string.diag_share_chooser)))
         }
     }
 
@@ -322,7 +324,7 @@ fun LiteScreen(
             val result = withContext(Dispatchers.Default) {
                 runCatching {
                     val pfd = context.contentResolver.openFileDescriptor(uri, "r")
-                        ?: error(context.getString(R.string.error_cannot_read_file))
+                        ?: error(res.getString(R.string.error_cannot_read_file))
                     var lastUpdate = 0L
                     hasher.hash(
                         source = AndroidFileSource(pfd, state.fileName, state.fileSize),
@@ -361,11 +363,11 @@ fun LiteScreen(
                 RunKeeper.end(
                     context,
                     when {
-                        cancelled -> context.getString(R.string.notif_title_cancelled, state.fileName)
-                        outcome.success -> context.getString(R.string.notif_title_done, state.fileName)
-                        else -> context.getString(R.string.notif_title_failed, state.fileName)
+                        cancelled -> res.getString(R.string.notif_title_cancelled, state.fileName)
+                        outcome.success -> res.getString(R.string.notif_title_done, state.fileName)
+                        else -> res.getString(R.string.notif_title_failed, state.fileName)
                     },
-                    if (cancelled) context.getString(R.string.notif_text_cancelled) else hashSummary(context, outcome),
+                    if (cancelled) res.getString(R.string.notif_text_cancelled) else hashSummary(context, outcome),
                     error = !outcome.success && !cancelled,
                     cancelled = cancelled,
                 )
@@ -374,8 +376,8 @@ fun LiteScreen(
                 Diagnostics.recordError(context, "哈希计算异常", "${Diagnostics.maskFileName(state.fileName)}: ${it.message ?: it}", it)
                 RunKeeper.end(
                     context,
-                    context.getString(R.string.notif_title_failed, state.fileName),
-                    it.message ?: context.getString(R.string.notif_unknown_error),
+                    res.getString(R.string.notif_title_failed, state.fileName),
+                    it.message ?: res.getString(R.string.notif_unknown_error),
                     error = true,
                 )
             }

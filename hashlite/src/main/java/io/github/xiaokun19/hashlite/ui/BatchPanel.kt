@@ -41,6 +41,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.AnnotatedString
@@ -189,8 +190,9 @@ class BatchUiState {
 
 /**批量校验区块：窄屏单列滚动；宽屏（≥600dp）双栏——左=操作，右=结果。 */
 @Composable
-fun BatchSection(state: BatchUiState, wide: Boolean = false, modifier: Modifier = Modifier) {
+fun BatchSection(state: BatchUiState, modifier: Modifier = Modifier, wide: Boolean = false) {
     val context = LocalContext.current
+    val res = LocalResources.current
     val clipboard = LocalClipboardManager.current
     val scope = rememberCoroutineScope()
     var engine by remember { mutableStateOf<BatchHasher?>(null) }
@@ -226,7 +228,7 @@ fun BatchSection(state: BatchUiState, wide: Boolean = false, modifier: Modifier 
             scope.launch {
                 val text = state.exportText()
                 if (text == null) {
-                    state.error = context.getString(R.string.batch_nothing_to_export)
+                    state.error = res.getString(R.string.batch_nothing_to_export)
                     return@launch
                 }
                 val ok = withContext(Dispatchers.IO) { SafTree.writeText(context.contentResolver, uri, text) }
@@ -235,7 +237,7 @@ fun BatchSection(state: BatchUiState, wide: Boolean = false, modifier: Modifier 
                     delay(1600)
                     if (state.copied == "SAVED") state.copied = null
                 } else {
-                    state.error = context.getString(R.string.batch_write_failed)
+                    state.error = res.getString(R.string.batch_write_failed)
                     Diagnostics.recordError(context, "清单导出写入失败", null)
                 }
             }
@@ -277,7 +279,7 @@ fun BatchSection(state: BatchUiState, wide: Boolean = false, modifier: Modifier 
                         state.progress = progress
                         RunKeeper.progress(
                             context,
-                            context.getString(
+                            res.getString(
                                 R.string.notif_batch_progress,
                                 progress.filesDone,
                                 progress.filesTotal,
@@ -309,11 +311,11 @@ fun BatchSection(state: BatchUiState, wide: Boolean = false, modifier: Modifier 
                 RunKeeper.end(
                     context,
                     when {
-                        cancelled -> context.getString(R.string.notif_title_cancelled, state.folderName)
-                        hasProblem -> context.getString(R.string.notif_title_batch_problem, state.folderName)
-                        else -> context.getString(R.string.notif_title_batch_done, state.folderName)
+                        cancelled -> res.getString(R.string.notif_title_cancelled, state.folderName)
+                        hasProblem -> res.getString(R.string.notif_title_batch_problem, state.folderName)
+                        else -> res.getString(R.string.notif_title_batch_done, state.folderName)
                     },
-                    context.getString(
+                    res.getString(
                         R.string.notif_batch_result_text,
                         report.matchedCount,
                         report.mismatchedCount,
@@ -328,8 +330,8 @@ fun BatchSection(state: BatchUiState, wide: Boolean = false, modifier: Modifier 
                 Diagnostics.recordError(context, "批量计算异常", it.message ?: it.toString(), it)
                 RunKeeper.end(
                     context,
-                    context.getString(R.string.notif_title_batch_failed, state.folderName),
-                    it.message ?: context.getString(R.string.notif_unknown_error),
+                    res.getString(R.string.notif_title_batch_failed, state.folderName),
+                    it.message ?: res.getString(R.string.notif_unknown_error),
                     error = true,
                 )
             }
@@ -610,6 +612,7 @@ private fun ParallelCard(state: BatchUiState) {
 private fun BatchAction(state: BatchUiState, onStart: () -> Unit, onCancel: () -> Unit) {
     val colors = MaterialTheme.colorScheme
     val context = LocalContext.current
+    val res = LocalResources.current
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
         Button(
             onClick = onStart,
@@ -641,13 +644,13 @@ private fun BatchAction(state: BatchUiState, onStart: () -> Unit, onCancel: () -
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(
                         buildString {
-                            append(context.getString(R.string.batch_progress_files, progress.filesDone, progress.filesTotal))
+                            append(res.getString(R.string.batch_progress_files, progress.filesDone, progress.filesTotal))
                             if (progress.bytesTotal > 0L) {
                                 append(" · ").append(HashParse.formatBytes(progress.bytesDone))
                                 append(" / ").append(HashParse.formatBytes(progress.bytesTotal))
                             }
                             append(" · ").append(
-                                context.getString(
+                                res.getString(
                                     R.string.label_aggregate,
                                     HashParse.formatSpeed(progress.aggregateBytesPerSec),
                                 ),
@@ -663,9 +666,9 @@ private fun BatchAction(state: BatchUiState, onStart: () -> Unit, onCancel: () -
                 }
                 if (progress.running.isNotEmpty()) {
                     Text(
-                        context.getString(
+                        res.getString(
                             R.string.label_running_files,
-                            progress.running.joinToString(context.getString(R.string.list_separator)) {
+                            progress.running.joinToString(res.getString(R.string.list_separator)) {
                                 it.substringAfterLast('/')
                             },
                         ),
@@ -723,6 +726,7 @@ private fun BatchResultCard(state: BatchUiState, report: BatchReport, onCopy: (S
     val colors = MaterialTheme.colorScheme
 
     val context = LocalContext.current
+    val res = LocalResources.current
     val averagePerFile = report.results.filter { it.bytesPerSec > 0.0 }.map { it.bytesPerSec }.average()
     val problems = report.results.filter { it.verdict == Verdict.MISMATCH || it.verdict == Verdict.ERROR }
     val sorted = report.results.sortedWith(compareBy({ severity(it.verdict) }, { it.name }))
@@ -783,7 +787,7 @@ private fun BatchResultCard(state: BatchUiState, report: BatchReport, onCopy: (S
                             Text(
                                 buildString {
                                     append(
-                                        context.getString(
+                                        res.getString(
                                             R.string.batch_summary_counts,
                                             report.matchedCount,
                                             report.mismatchedCount,
@@ -792,7 +796,7 @@ private fun BatchResultCard(state: BatchUiState, report: BatchReport, onCopy: (S
                                         ),
                                     )
                                     if (report.errorCount > 0) {
-                                        append(context.getString(R.string.batch_summary_error_suffix, report.errorCount))
+                                        append(res.getString(R.string.batch_summary_error_suffix, report.errorCount))
                                     }
                                 },
                                 fontSize = 11.sp,
@@ -806,15 +810,15 @@ private fun BatchResultCard(state: BatchUiState, report: BatchReport, onCopy: (S
             // 吞吐：聚合速度是"并行度有用没用"的直接答案
             Text(
                 buildString {
-                    append(context.getString(R.string.throughput_aggregate, HashParse.formatSpeed(report.aggregateBytesPerSec)))
-                    append(" · ").append(context.getString(R.string.throughput_workers, report.workers))
+                    append(res.getString(R.string.throughput_aggregate, HashParse.formatSpeed(report.aggregateBytesPerSec)))
+                    append(" · ").append(res.getString(R.string.throughput_workers, report.workers))
                     if (!averagePerFile.isNaN() && averagePerFile > 0.0) {
                         append(" · ").append(
-                            context.getString(R.string.throughput_avg_per_file, HashParse.formatSpeed(averagePerFile)),
+                            res.getString(R.string.throughput_avg_per_file, HashParse.formatSpeed(averagePerFile)),
                         )
                     }
-                    append(" · ").append(context.getString(R.string.throughput_elapsed, HashParse.formatDuration(report.elapsedNanos)))
-                    append(" · ").append(context.getString(R.string.throughput_total, HashParse.formatBytes(report.totalBytes)))
+                    append(" · ").append(res.getString(R.string.throughput_elapsed, HashParse.formatDuration(report.elapsedNanos)))
+                    append(" · ").append(res.getString(R.string.throughput_total, HashParse.formatBytes(report.totalBytes)))
                 },
                 fontSize = 11.5.sp,
                 lineHeight = 16.sp,
@@ -865,6 +869,7 @@ private fun BatchResultCard(state: BatchUiState, report: BatchReport, onCopy: (S
 private fun BatchResultRow(result: io.github.xiaokun19.hashlite.core.BatchFileResult) {
     val colors = MaterialTheme.colorScheme
     val context = LocalContext.current
+    val res = LocalResources.current
     val accent = when (result.verdict) {
         Verdict.MATCH -> io.github.xiaokun19.hashlite.ui.theme.verdictColors(true).first
         Verdict.MISMATCH, Verdict.ERROR -> io.github.xiaokun19.hashlite.ui.theme.verdictColors(false).first
@@ -895,7 +900,7 @@ private fun BatchResultRow(result: io.github.xiaokun19.hashlite.core.BatchFileRe
                     if (result.size > 0L) append(" · ").append(HashParse.formatBytes(result.size))
                     if (result.bytesPerSec > 0.0) append(" · ").append(HashParse.formatSpeed(result.bytesPerSec))
                     when {
-                        result.cancelled -> append(" · ").append(context.getString(R.string.state_cancelled))
+                        result.cancelled -> append(" · ").append(res.getString(R.string.state_cancelled))
                         else -> result.error?.let { append(" · ").append(it) }
                     }
                 },
@@ -906,7 +911,7 @@ private fun BatchResultRow(result: io.github.xiaokun19.hashlite.core.BatchFileRe
             if (hex != null) {
                 Text(
                     if (result.verdict == Verdict.MISMATCH) {
-                        context.getString(R.string.batch_actual_hex, hex.take(20))
+                        res.getString(R.string.batch_actual_hex, hex.take(20))
                     } else {
                         hex
                     },
@@ -920,7 +925,7 @@ private fun BatchResultRow(result: io.github.xiaokun19.hashlite.core.BatchFileRe
             if (result.verdict == Verdict.MISMATCH) {
                 result.expected?.let {
                     Text(
-                        context.getString(R.string.batch_expected_hex, it.take(20)),
+                        res.getString(R.string.batch_expected_hex, it.take(20)),
                         fontSize = 10.5.sp,
                         fontFamily = FontFamily.Monospace,
                         color = colors.onSurfaceVariant,
@@ -942,6 +947,7 @@ private fun ExportCard(
 ) {
     val colors = MaterialTheme.colorScheme
     val context = LocalContext.current
+    val res = LocalResources.current
     val algorithms = state.exportableAlgorithms()
     val text = state.exportText()
 
@@ -1004,7 +1010,7 @@ private fun ExportCard(
             }
 
             Text(
-                context.getString(
+                res.getString(
                     R.string.export_preview,
                     text?.lineSequence()?.take(2)?.joinToString(" / ")?.take(80) ?: "—",
                 ),

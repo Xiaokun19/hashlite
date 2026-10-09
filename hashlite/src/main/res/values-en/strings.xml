@@ -157,7 +157,7 @@
     <string name="settings_keep_awake">Keep computing with the screen off (wake lock)</string>
     <string name="settings_keep_awake_sub">Holds a partial wake lock for long tasks (CPU stays awake). Not guaranteed to beat some custom ROMs’ freeze-on-screen-off behavior; a last-resort safeguard, at a small battery cost.</string>
     <string name="settings_battery">Unrestricted battery usage</string>
-    <string name="settings_battery_on">Whitelisted: less likely to be frozen (some custom ROMs are aggressive; not a 100% guarantee)</string>
+    <string name="settings_battery_on">Whitelisted: less likely to be frozen (some custom ROMs are aggressive; no guarantee)</string>
     <string name="settings_battery_off">Not whitelisted: it may be frozen while the screen is off / in the background (even the foreground service gets frozen in our tests) — adding the whitelist is recommended</string>
     <string name="action_go_settings">Open settings</string>
 
