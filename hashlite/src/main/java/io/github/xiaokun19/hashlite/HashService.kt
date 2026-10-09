@@ -1,5 +1,6 @@
 package io.github.xiaokun19.hashlite
 
+import android.annotation.SuppressLint
 import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
@@ -11,6 +12,7 @@ import android.os.Build
 import android.os.IBinder
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
+import androidx.core.content.ContextCompat
 
 /**
  * 哈希期间的**前台服务**（常驻通知）。
@@ -63,6 +65,9 @@ class HashService : Service() {
         super.onDestroy()
     }
 
+    // 通知是 best-effort：Android 13+ 未授权时系统静默丢弃；万一抛 SecurityException，
+    // 也已由下方 runCatching 兜住——这里不需要额外的权限分支（低版本更没有该运行时权限）。
+    @SuppressLint("MissingPermission")
     private fun startOrUpdate(title: String, text: String?, percent: Int?) {
         ensureChannels(this)
         val notification = buildOngoing(title, text, percent)
@@ -136,7 +141,9 @@ class HashService : Service() {
         fun start(context: Context, title: String) {
             val intent = Intent(context, HashService::class.java).setAction(ACTION_START)
                 .putExtra(EXTRA_TITLE, title)
-            runCatching { context.startForegroundService(intent) }
+            // ContextCompat 在 API<26 回退 startService：裸调 startForegroundService 在 24/25 上
+            // 会 NoSuchMethodError（被 runCatching 静默吞掉 → 前台服务根本起不来）。
+            runCatching { ContextCompat.startForegroundService(context, intent) }
         }
 
         fun update(context: Context, title: String, text: String, percent: Int?) {
@@ -144,7 +151,7 @@ class HashService : Service() {
                 .putExtra(EXTRA_TITLE, title)
                 .putExtra(EXTRA_TEXT, text)
                 .putExtra(EXTRA_PERCENT, percent ?: -1)
-            runCatching { context.startForegroundService(intent) }
+            runCatching { ContextCompat.startForegroundService(context, intent) }
         }
 
         /**
@@ -172,6 +179,8 @@ class HashService : Service() {
         }
 
         /** 结束提醒：普通通知，可滑掉、点了回 App。 */
+        // 同上：完成通知属 best-effort，权限缺失时丢弃即可，异常已由 runCatching 兜住。
+        @SuppressLint("MissingPermission")
         fun notifyResult(context: Context, title: String, text: String, error: Boolean) {
             ensureChannels(context)
             val notification = NotificationCompat.Builder(context, CHANNEL_RESULT)
