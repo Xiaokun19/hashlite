@@ -680,6 +680,38 @@ EOF
   log "gradle.properties: android.aapt2FromMavenOverride=$AAPT2_OVERRIDE_PATH"
 }
 
+# ARM64 主机的坑：NDK 自带的宿主工具链是 x86_64，其中的 llvm-strip 在 ARM64 上
+# 无法执行（Exec format error）。AGP 的 stripDebugDebugSymbols 会用它剥预编译 .so
+# （例如 androidx.graphics.path），依赖里一带 native 库，本地构建就卡在这里。
+# 修复：把 llvm-strip 指向系统自带的可执行 strip（GNU）。二者对 AGP 使用的
+# "--strip-unneeded ... -o ..." 参数接口兼容；不支持的架构（如 x86/x86_64 库）会报错，
+# 但 AGP 会"原样打包"继续（仅警告）。x86_64 主机上原版可执行，本函数自动跳过。
+fix_ndk_llvm_strip() {
+  local host_strip
+  host_strip=$(command -v strip 2>/dev/null || true)
+  if [[ -z "$host_strip" ]]; then
+    log "System strip not found; skipping NDK llvm-strip fix"
+    return 0
+  fi
+
+  local ndk_dir strip_path
+  for ndk_dir in "$ANDROID_HOME"/ndk/*; do
+    [[ -d "$ndk_dir" ]] || continue
+    strip_path="$ndk_dir/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-strip"
+    [[ -e "$strip_path" || -L "$strip_path" ]] || continue
+    # 能跑就别动：x86_64 主机上是原版；修过之后指向系统 strip 也能跑
+    if "$strip_path" --version >/dev/null 2>&1; then
+      continue
+    fi
+    # 备份原始符号链接（只备份一次），再把 llvm-strip 指到系统 strip
+    if [[ ! -e "$strip_path.orig-x86symlink" && ! -L "$strip_path.orig-x86symlink" ]]; then
+      cp -a "$strip_path" "$strip_path.orig-x86symlink" 2>/dev/null || true
+    fi
+    ln -sf "$host_strip" "$strip_path"
+    log "Pinned NDK llvm-strip -> $host_strip: $strip_path"
+  done
+}
+
 main() {
   SCRIPT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
   cd "$SCRIPT_DIR"
@@ -706,6 +738,7 @@ main() {
   fi
   replace_aapt2
   configure_aapt2_override
+  fix_ndk_llvm_strip
   if ! warmup_gradle_cache_after_aapt2_replace; then
     log "Ignoring post-replace warm-up error and continuing"
   fi
