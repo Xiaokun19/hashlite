@@ -102,11 +102,13 @@ fun DiagnosticsSheet(
     onSave: () -> Unit,
     onCopy: () -> Unit,
     onDelete: () -> Unit,
+    onDeleteAll: () -> Unit,
     onClose: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val colors = MaterialTheme.colorScheme
     var confirmDelete by remember { mutableStateOf(false) }
+    var confirmDeleteAll by remember { mutableStateOf(false) }
 
     Surface(
         modifier = modifier
@@ -168,6 +170,9 @@ fun DiagnosticsSheet(
                     )
                 }
                 Spacer(Modifier.weight(1f))
+                TextButton(onClick = { confirmDeleteAll = true }) {
+                    Text(stringResource(R.string.diag_clear_all), fontSize = 13.sp, color = colors.error)
+                }
                 TextButton(onClick = { confirmDelete = true }) {
                     Text(stringResource(R.string.diag_delete), fontSize = 13.sp, color = colors.error)
                 }
@@ -234,6 +239,25 @@ fun DiagnosticsSheet(
             },
             dismissButton = {
                 TextButton(onClick = { confirmDelete = false }) { Text(stringResource(R.string.action_cancel)) }
+            },
+        )
+    }
+
+    if (confirmDeleteAll) {
+        AlertDialog(
+            onDismissRequest = { confirmDeleteAll = false },
+            title = { Text(stringResource(R.string.diag_clear_all)) },
+            text = { Text(stringResource(R.string.diag_clear_all_confirm, entries.size)) },
+            confirmButton = {
+                TextButton(onClick = {
+                    confirmDeleteAll = false
+                    onDeleteAll()
+                }) {
+                    Text(stringResource(R.string.diag_clear_all), color = colors.error)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { confirmDeleteAll = false }) { Text(stringResource(R.string.action_cancel)) }
             },
         )
     }

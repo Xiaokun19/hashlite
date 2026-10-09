@@ -296,7 +296,7 @@ fun BatchSection(state: BatchUiState) {
                 if (report.errorCount > 0 && !cancelled) {
                     val samples = report.results.filter { it.verdict == Verdict.ERROR && !it.cancelled }
                         .take(3)
-                        .joinToString("；") { "${it.name}: ${it.error ?: "未完成"}" }
+                        .joinToString("；") { "${Diagnostics.maskFileName(it.name)}: ${it.error ?: "未完成"}" }
                     Diagnostics.recordError(context, "批量中有文件读取失败", "共 ${report.errorCount} 个；样例：$samples")
                 }
                 Diagnostics.breadcrumb(

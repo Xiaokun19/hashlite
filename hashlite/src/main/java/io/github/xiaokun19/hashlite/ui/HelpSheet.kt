@@ -1,6 +1,7 @@
 package io.github.xiaokun19.hashlite.ui
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -24,9 +25,11 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import io.github.xiaokun19.hashlite.R
@@ -41,6 +44,7 @@ import io.github.xiaokun19.hashlite.R
 @Composable
 fun HelpSheet(onClose: () -> Unit, modifier: Modifier = Modifier) {
     val colors = MaterialTheme.colorScheme
+    val uriHandler = LocalUriHandler.current
     Surface(
         modifier = modifier
             .fillMaxWidth()
@@ -164,6 +168,20 @@ fun HelpSheet(onClose: () -> Unit, modifier: Modifier = Modifier) {
                 Bullet(
                     stringResource(R.string.help_tradeoff_parallel_title),
                     stringResource(R.string.help_tradeoff_parallel_body),
+                )
+
+                Section(stringResource(R.string.help_project_title))
+                Body(stringResource(R.string.help_project_body))
+                Text(
+                    "github.com/Xiaokun19/hashlite",
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.Medium,
+                    color = colors.primary,
+                    textDecoration = TextDecoration.Underline,
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(8.dp))
+                        .clickable { uriHandler.openUri("https://github.com/Xiaokun19/hashlite") }
+                        .padding(vertical = 3.dp),
                 )
 
                 Spacer(Modifier.height(4.dp))

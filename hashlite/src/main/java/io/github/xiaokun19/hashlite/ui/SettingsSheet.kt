@@ -62,6 +62,7 @@ fun SettingsSheet(
     themeMode: ThemeMode,
     language: String,
     languageEnabled: Boolean,
+    diagnosticsEnabled: Boolean,
     diagCrashCount: Int,
     diagErrorCount: Int,
     diagLatestLabel: String?,
@@ -71,6 +72,7 @@ fun SettingsSheet(
     onKeepAwake: (Boolean) -> Unit,
     onThemeMode: (ThemeMode) -> Unit,
     onLanguage: (String) -> Unit,
+    onDiagnosticsEnabled: (Boolean) -> Unit,
     onOpenDiag: () -> Unit,
     onRequestUnrestricted: () -> Unit,
     onClose: () -> Unit,
@@ -218,6 +220,14 @@ fun SettingsSheet(
 
                 Spacer(Modifier.height(14.dp))
                 SectionTitle(stringResource(R.string.settings_section_about))
+
+                // 诊断开关：关闭后不再记录（已有报告仍可查看 / 删除）
+                SwitchRow(
+                    title = stringResource(R.string.settings_diag_toggle),
+                    subtitle = stringResource(R.string.settings_diag_toggle_sub),
+                    checked = diagnosticsEnabled,
+                    onCheckedChange = onDiagnosticsEnabled,
+                )
 
                 // 诊断日志（崩溃 / 错误报告）：记录、查看、导出
                 Row(

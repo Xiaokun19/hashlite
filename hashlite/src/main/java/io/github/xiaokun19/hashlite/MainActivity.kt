@@ -153,7 +153,7 @@ class MainActivity : ComponentActivity() {
 
     private fun handleIncoming(intent: Intent?) {
         val uri = extractUri(intent) ?: return
-        Diagnostics.breadcrumb("intent.file $uri")
+        Diagnostics.breadcrumb("intent.file ${Diagnostics.uriLabel(uri)}")
         incomingUri.value = uri
         incomingNonce.value += 1
     }

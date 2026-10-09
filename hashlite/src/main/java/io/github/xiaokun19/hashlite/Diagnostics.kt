@@ -1,6 +1,7 @@
 package io.github.xiaokun19.hashlite
 
 import android.content.Context
+import android.net.Uri
 import android.os.Build
 import android.os.Process
 import android.os.SystemClock
@@ -50,9 +51,17 @@ object Diagnostics {
     private var appStartElapsed = 0L
     private var appInfoLine = ""
 
+    /**
+     * 是否记录（由设置项 [AppSettings.diagnosticsEnabled] 驱动，默认开）。
+     * 关闭后：不再积累面包屑、不再写新的崩溃 / 错误报告；已有报告仍可在面板里查看与删除。
+     */
+    @Volatile
+    var recordingEnabled: Boolean = true
+
     /** 在 Application.onCreate 里尽早调用。 */
     fun install(context: Context) {
         val app = context.applicationContext
+        recordingEnabled = AppSettings.of(app).diagnosticsEnabled
         appStartElapsed = SystemClock.elapsedRealtime()
         appInfoLine = runCatching {
             val info = app.packageManager.getPackageInfo(app.packageName, 0)
@@ -67,7 +76,9 @@ object Diagnostics {
         val previous = Thread.getDefaultUncaughtExceptionHandler()
         Thread.setDefaultUncaughtExceptionHandler { thread, throwable ->
             // 先记录，再交回系统（顺序不能反：交回后进程通常立刻被杀）
-            runCatching { writeReport(app, Kind.CRASH, "未捕获异常", null, throwable, thread) }
+            if (recordingEnabled) {
+                runCatching { writeReport(app, Kind.CRASH, "未捕获异常", null, throwable, thread) }
+            }
             if (previous != null) {
                 previous.uncaughtException(thread, throwable)
             } else {
@@ -85,6 +96,7 @@ object Diagnostics {
 
     /** 记一条"面包屑"（环形缓冲，崩溃/错误报告会带上它）。任何线程都可以调。 */
     fun breadcrumb(message: String) {
+        if (!recordingEnabled) return
         val line = "[${timeText(System.currentTimeMillis())}] ${message.take(300)}"
         synchronized(lock) {
             if (breadcrumbs.size >= BREADCRUMB_CAPACITY) breadcrumbs.removeFirst()
@@ -94,6 +106,7 @@ object Diagnostics {
 
     /** 记一条**非致命**错误（降级、失败事件），不会中断运行。 */
     fun recordError(context: Context, title: String, detail: String? = null, throwable: Throwable? = null) {
+        if (!recordingEnabled) return
         runCatching {
             breadcrumb("error: $title")
             writeReport(context.applicationContext, Kind.ERROR, title, detail, throwable, Thread.currentThread())
@@ -102,6 +115,19 @@ object Diagnostics {
 
     /** 同一进程内只执行一次（返回 true = 第一次）。用于"启动检查只报一次"这类场景。 */
     fun once(key: String): Boolean = onceKeys.add(key)
+
+    /**
+     * 把文件名脱敏成 `***.扩展名`（无扩展名 → `***`）——
+     * 诊断报告隐私增强：报告里保留"文件类型"，不保留真实文件名。
+     */
+    fun maskFileName(name: String): String {
+        val dot = name.lastIndexOf('.')
+        if (dot <= 0 || dot == name.length - 1) return "***"
+        return "***" + name.substring(dot).take(20)
+    }
+
+    /** 记录 URI 时只保留 scheme 与 authority（如 `content://com.android.externalstorage.documents`），不落具体路径 / 文件名。 */
+    fun uriLabel(uri: Uri): String = "${uri.scheme ?: "?"}://${uri.authority ?: ""}"
 
     // ------------------------------------------------------------------ 落盘
 
@@ -214,6 +240,13 @@ object Diagnostics {
 
     fun delete(context: Context, entry: Entry): Boolean =
         runCatching { entry.file.delete() }.getOrDefault(false)
+
+    /** 删除全部诊断日志，返回成功删除的份数。 */
+    fun deleteAll(context: Context): Int = runCatching {
+        val dir = reportDir(context)
+        val files = dir.listFiles { f -> isReport(f.name) } ?: return@runCatching 0
+        files.count { f -> runCatching { f.delete() }.getOrDefault(false) }
+    }.getOrDefault(0)
 
     /** 最新一条"没被看过"的报告（主界面卡片提示用）。 */
     fun latestUnseen(context: Context): Entry? {

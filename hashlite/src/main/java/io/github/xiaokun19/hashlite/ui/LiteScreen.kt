@@ -181,6 +181,7 @@ fun LiteScreen(
     var notifyResult by remember { mutableStateOf(appSettings.notifyResult) }
     var keepAwake by remember { mutableStateOf(appSettings.keepAwake) }
     var language by remember { mutableStateOf(appSettings.language) }
+    var diagnosticsEnabled by remember { mutableStateOf(appSettings.diagnosticsEnabled) }
 
     // 诊断日志（崩溃 + 非致命错误）：列表 / 未读提示 / 查看与导出
     var diagFiles by remember { mutableStateOf<List<Diagnostics.Entry>>(emptyList()) }
@@ -253,6 +254,21 @@ fun LiteScreen(
         diagUnseen = Diagnostics.latestUnseen(context)
     }
 
+    /** 删除（单份或全部）之后：刷新列表，并选中下一份；没有就关面板。 */
+    fun afterDiagDeletion() {
+        val list = Diagnostics.list(context)
+        diagFiles = list
+        diagUnseen = Diagnostics.latestUnseen(context)
+        val next = list.firstOrNull()
+        if (next == null) {
+            showDiagSheet = false
+            diagSelected = null
+        } else {
+            diagSelected = next
+            diagText = Diagnostics.read(context, next)
+        }
+    }
+
     fun openDiagSheet(entry: Diagnostics.Entry?) {
         val list = Diagnostics.list(context)
         val target = entry ?: list.firstOrNull() ?: return
@@ -295,7 +311,7 @@ fun LiteScreen(
         )
         RunKeeper.setCancelHook { hasher.cancel() } // 通知栏上的"取消"
         Diagnostics.breadcrumb(
-            "hash.start name=${state.fileName.take(120)} size=${state.fileSize} " +
+            "hash.start name=${Diagnostics.maskFileName(state.fileName)} size=${state.fileSize} " +
                 "algos=${state.selected.joinToString("/") { it.label }}",
         )
         scope.launch {
@@ -335,7 +351,7 @@ fun LiteScreen(
                 val cancelled = outcome.cancelled
                 if (outcome.error != null) {
                     state.error = outcome.error
-                    Diagnostics.recordError(context, "哈希读取失败", "${state.fileName}: ${outcome.error}")
+                    Diagnostics.recordError(context, "哈希读取失败", "${Diagnostics.maskFileName(state.fileName)}: ${outcome.error}")
                 }
                 Diagnostics.breadcrumb("hash.end ok=${outcome.success} cancelled=$cancelled err=${outcome.error ?: "-"}")
                 RunKeeper.end(
@@ -351,7 +367,7 @@ fun LiteScreen(
                 )
             }.onFailure {
                 state.error = it.message ?: it.toString()
-                Diagnostics.recordError(context, "哈希计算异常", "${state.fileName}: ${it.message ?: it}", it)
+                Diagnostics.recordError(context, "哈希计算异常", "${Diagnostics.maskFileName(state.fileName)}: ${it.message ?: it}", it)
                 RunKeeper.end(
                     context,
                     context.getString(R.string.notif_title_failed, state.fileName),
@@ -537,6 +553,7 @@ fun LiteScreen(
                     themeMode = themeMode,
                     language = language,
                     languageEnabled = !state.running,
+                    diagnosticsEnabled = diagnosticsEnabled,
                     diagCrashCount = diagFiles.count { it.kind == Diagnostics.Kind.CRASH },
                     diagErrorCount = diagFiles.count { it.kind == Diagnostics.Kind.ERROR },
                     diagLatestLabel = diagFiles.firstOrNull()?.let { Diagnostics.displayTime(it.timeMillis) },
@@ -566,6 +583,11 @@ fun LiteScreen(
                         appSettings.language = chosen
                         // 语言资源要靠 recreate 重载（locale 在 attachBaseContext 里套）
                         (context as? Activity)?.recreate()
+                    },
+                    onDiagnosticsEnabled = { value ->
+                        diagnosticsEnabled = value
+                        appSettings.diagnosticsEnabled = value
+                        Diagnostics.recordingEnabled = value
                     },
                     onOpenDiag = { openDiagSheet(null) },
                     onRequestUnrestricted = { requestBatteryUnrestricted(context) },
@@ -607,17 +629,11 @@ fun LiteScreen(
                     },
                     onDelete = {
                         diagSelected?.let { Diagnostics.delete(context, it) }
-                        val list = Diagnostics.list(context)
-                        diagFiles = list
-                        diagUnseen = Diagnostics.latestUnseen(context)
-                        val next = list.firstOrNull()
-                        if (next == null) {
-                            showDiagSheet = false
-                            diagSelected = null
-                        } else {
-                            diagSelected = next
-                            diagText = Diagnostics.read(context, next)
-                        }
+                        afterDiagDeletion()
+                    },
+                    onDeleteAll = {
+                        Diagnostics.deleteAll(context)
+                        afterDiagDeletion()
                     },
                     onClose = { showDiagSheet = false },
                     modifier = Modifier.align(Alignment.BottomCenter),

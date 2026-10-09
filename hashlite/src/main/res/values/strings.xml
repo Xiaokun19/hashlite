@@ -278,4 +278,10 @@
     <plurals name="export_default_name">
         <item quantity="other">默认文件名 %1$s · 共 %2$d 条</item>
     </plurals>
+    <string name="settings_diag_toggle">记录诊断日志</string>
+    <string name="settings_diag_toggle_sub">崩溃与错误会自动记录在本机（不联网、不上传）；关闭后不再记录新报告，已有报告仍可查看与删除</string>
+    <string name="diag_clear_all">清空全部</string>
+    <string name="diag_clear_all_confirm">将删除全部 %1$d 份诊断日志，此操作无法撤销。</string>
+    <string name="help_project_title">项目主页</string>
+    <string name="help_project_body">本应用是开源项目；最新版本、问题反馈与开发动态都在 GitHub：</string>
 </resources>

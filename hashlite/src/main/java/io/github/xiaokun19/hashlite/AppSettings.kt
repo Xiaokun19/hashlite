@@ -63,6 +63,14 @@ class AppSettings(context: Context) {
         get() = prefs.getString(KEY_LANGUAGE, LANG_SYSTEM) ?: LANG_SYSTEM
         set(value) = prefs.edit().putString(KEY_LANGUAGE, value).apply()
 
+    /**
+     * 是否记录诊断日志（崩溃 / 错误报告与最近事件）。默认开。
+     * 关闭后不再写新的报告；已有报告仍可在"设置 → 诊断日志"里查看与删除。
+     */
+    var diagnosticsEnabled: Boolean
+        get() = prefs.getBoolean(KEY_DIAGNOSTICS, true)
+        set(value) = prefs.edit().putBoolean(KEY_DIAGNOSTICS, value).apply()
+
     companion object {
         const val PREFS = "hashlite"
         const val KEY_KEEP_SCREEN_ON = "keepScreenOn"
@@ -71,6 +79,7 @@ class AppSettings(context: Context) {
         const val KEY_KEEP_AWAKE = "keepAwake"
         const val KEY_THEME_MODE = "themeMode"
         const val KEY_LANGUAGE = "language"
+        const val KEY_DIAGNOSTICS = "diagnosticsEnabled"
 
         const val LANG_SYSTEM = "system"
         const val LANG_ZH = "zh"

@@ -287,4 +287,10 @@
         <item quantity="one">Default name %1$s · %2$d entry</item>
         <item quantity="other">Default name %1$s · %2$d entries</item>
     </plurals>
+    <string name="settings_diag_toggle">Record diagnostics</string>
+    <string name="settings_diag_toggle_sub">Crashes and errors are recorded on this device (no network, no upload). When off, no new reports are written; existing ones stay viewable</string>
+    <string name="diag_clear_all">Clear all</string>
+    <string name="diag_clear_all_confirm">Delete all %1$d diagnostics reports? This cannot be undone.</string>
+    <string name="help_project_title">Project</string>
+    <string name="help_project_body">This app is open source — latest releases, issue tracker and updates live on GitHub:</string>
 </resources>
